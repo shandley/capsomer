@@ -95,11 +95,11 @@ A valid bundle needs the tables marked required, at least one count table, and t
 | `sample` (required) | a sample | Control type is required. MIxS terms (the Genomic Standards Consortium's sample vocabulary) where they exist. |
 | `library` (required) | a sequencing library | Its sample, nucleic acid type, enrichment, amplification, whether it is stranded, single or paired layout, and read and fragment totals before and after quality control. |
 | `run` (required) | one execution of one tool | Tool, version, and the step it performed. |
-| `reference_release` (required) | one dated version of a database or taxonomy | Name, version, date, source, checksum. |
-| `sequence` (required) | one nucleotide sequence, or one read pair kept as a unit | Kind (read cluster, read pair cluster, contig or reference), length, the bases, and the name its producer gave it. A read pair has a second column of bases. |
-| `taxon` (required) | one taxon in one release | The release's own identifier, name, rank, parent taxon, genome composition (Baltimore class) and host category. |
+| `reference_release` (required) | one dated version of a database, taxonomy or catalog | Name, version, date, source, checksum, and kind: formal taxonomy, catalog of uncultivated viruses, or sequence database. |
+| `sequence` (required) | one nucleotide sequence, or one read pair kept as a unit | Kind (read cluster, read pair cluster, contig or reference), length, the bases, and the name its producer gave it. A read pair has a second column of bases. Optional columns hold GC content and a complexity score, which help separate low-complexity artifacts from unknown biology. |
+| `taxon` (required) | one taxon in one release | The release's own identifier, name, rank, parent taxon, genome composition (Baltimore class) and host category. A group in a catalog of uncultivated viruses is a taxon too, under that catalog's release. |
 | `genome` | one unit treated as a virus genome | Kind: single sequence, bin, or group of segments. |
-| `cluster` | one cluster of genomes | Level (strain, species, genus or family) and the representative genome. A cluster needs no taxon name, so unclassified groups are first-class. |
+| `cluster` | one cluster of genomes or of sequences | Level (strain, species, genus, family, or a level the researcher defines) and the representative. A cluster needs no taxon name, so unclassified groups are first-class. |
 
 `taxon` may also carry one column per major rank, holding the name of the ancestor at that rank. With those columns it reads like the taxonomy table of a phyloseq object. They are for reading; joins use identifiers.
 
@@ -124,7 +124,7 @@ A valid bundle needs the tables marked required, at least one count table, and t
 |---|---|---|
 | `alignment` | one alignment of one sequence to another | Coordinates (1-based, inclusive), identity, length, e-value, bit score, nucleotide or translated search, and a flag for the primary alignment. For a read pair, which of the two reads aligned. |
 | `genome_member` | one sequence in one genome | Segment label where relevant. |
-| `cluster_member` | one genome in one cluster | |
+| `cluster_member` | one member of one cluster | The member is a genome or a sequence in the bundle, or a reference genome given by accession and release. A cluster with no reference member is novel with respect to that release. |
 | `sequence_relation` | one stated relation between two sequences | Reverse complement, rotation, or part of a longer sequence with its coordinates. |
 | `run_reference` | one reference release read by one run | |
 | `taxon_change` | one change to a taxon between two releases | Old taxon, new taxon, type of change. |
@@ -142,6 +142,7 @@ Counts are stored once, at the finest level measured. Counts at higher levels ar
 | read cluster | contig | `alignment`, primary alignments only |
 | contig | genome | `genome_member` |
 | genome | cluster | `cluster_member` |
+| read cluster or contig | cluster | `cluster_member`, where a researcher clustered sequences directly |
 | any of these | taxon | `taxon_assignment`, preferred rows only |
 | taxon | higher rank | the parent column of `taxon` |
 
@@ -149,9 +150,9 @@ The primary flag and the preferred flag exist so that each fragment is counted o
 
 ## Read clusters
 
-A read cluster is a set of reads or read pairs from one library that a pipeline grouped and represented by one sequence, with a count. The definition follows Hecatomb, which clusters each sample separately and keeps a count for each representative.
+A read cluster is a set of reads or read pairs from one library that a pipeline grouped and represented by one sequence, with a count. Hecatomb is one example: it clusters each sample separately and keeps a count for each representative.
 
-- Clustering happens within one library. Reads from different libraries are never clustered together.
+- A read cluster is formed within one library. A researcher who groups read clusters or contigs across libraries records that as a `cluster`, at whatever level they choose.
 - The clustering level is the researcher's choice. The standard sets no identity threshold and recommends none. Exact matching, Hecatomb version 1's 97% identity, or any other level is valid. The run records the method, the thresholds and how the representative was chosen, in `run_parameter`.
 - The unit is whatever the pipeline clustered. The five read forms below cover it, and a pipeline may mix them.
 - Reads on opposite strands are different sequences. They stay separate unless the pipeline's clustering merged them.
@@ -175,18 +176,36 @@ For independent reads, the same sequence seen as a first read and as a second re
 
 The container performs one merge of its own. Two clusters in the same library, the same read form and the same end whose stored sequences are identical, byte for byte, become one row with the counts added. This follows from naming a sequence by its content.
 
-## Sequences with no match
+## Dark matter
 
-Sequences that match nothing in any database, often called dark matter, are kept and counted like any other sequence. Four provisions make them traceable.
+Sequences that match nothing known, or match only weakly, are often called dark matter. They occur at every level: reads, contigs, genomes and clusters. The standard keeps and counts them like any other sequence.
+
+What a bundle records:
 
 - A sequence needs no label to exist. A read cluster or contig that matched nothing still has its `sequence` row and its counts.
 - A search that found nothing is recorded. `taxon_assignment` holds a row with no taxon and `outcome` set to `none`, so the unmatched set of each run is explicit.
+- Weak matches keep their statistics. Every stored alignment carries its e-value, bit score and identity, so a low-identity hit is available to anyone who looks, whatever cutoff the original analysis applied.
+- The bases travel with the bundle. For a dark sequence the bases are its only identity; without them it cannot be searched again or compared with another study. A read cluster or contig without bases raises a warning.
 - A cluster needs no taxon name. Within one study, an unmatched genome found in forty samples is one `cluster` row with forty counts.
+- Dark reads and contigs can be grouped across samples, as clusters of sequences.
 - Omissions are visible. If a pipeline leaves unmatched reads out of the bundle, its counts fall short of the library total, and the shortfall is the number of fragments left out.
 
-Across studies the design does less. An identifier matches only a byte-identical sequence, and the same unknown genome assembled in two studies will usually differ by a few bases, by strand or by start position. Recognising it in both takes a comparison step: clustering the genomes of the combined bundles, or assigning each study's genomes to a shared catalog. A bundle keeps what that step needs, but it does not perform it.
+### How dark
 
-How dark a sequence is stays a question for the analyst. No match at all, a match only to a distant protein, and an assignment no deeper than "Viruses" are all recoverable from `taxon_assignment`, `alignment` and the rank in `taxon`. The standard fixes no threshold between them.
+Four levels can be told apart by query. The standard fixes no threshold between them.
+
+| Level | How it shows in the tables |
+|---|---|
+| Named | assigned to a taxon in a formal taxonomy such as ICTV |
+| Seen before, unnamed | assigned only to a group in a catalog of uncultivated viruses, or clustered with a reference genome that has no formal name |
+| Recurrent in this study | no assignment, but found in more than one sample, by identical sequence, by alignment to a shared contig, or by cluster |
+| Seen once | no assignment and found in one sample |
+
+Dark status is relative to a date. Each search is a run against a dated release, so a sequence that matched nothing in 2022 and matches in 2026 has two runs with different answers.
+
+### Across studies
+
+Combining bundles joins their tables. It does not recognise the same unknown virus in two studies. An identifier matches only a byte-identical sequence, and the same genome assembled twice will usually differ by a few bases, by strand or by start position. Recognising it takes a comparison step over the combined bundles: a new clustering run over all the genomes, or assignment of each study's genomes to a shared catalog. The result is stored like any other cluster or label. A bundle keeps what that step needs, but it does not perform it.
 
 ## Other data types
 
@@ -231,7 +250,7 @@ A bundle is checked against the standard, and each check has a severity. The thr
 |---|---|---|
 | Critical | The bundle cannot be read reliably. | A required table or column is missing. An identifier appears twice in a thing table. The manifest is absent. |
 | Error | The bundle can be read, but an analysis of it would be wrong. | An identifier column points at a row that does not exist. Counts exceed the library total. A count, label or link row names no run. A thing has two preferred rows from one run. |
-| Warning | The bundle is usable but incomplete. | Counts fall short of the library total. A run lists no parameters. A reference release has no checksum. A column has no description. |
+| Warning | The bundle is usable but incomplete. | Counts fall short of the library total. A read cluster or contig has no bases. A run lists no parameters. A reference release has no checksum. A column has no description. |
 
 A bundle conforms when it has no critical failures and no errors. Warnings are reported and do not block. For each failed check the report gives the number of failing rows and can list them.
 
@@ -251,12 +270,15 @@ Answerable with the version 1 catalog:
 6. Were two bundles clustered at the same level and searched against the same reference releases?
 7. Which tables derive from restricted inputs?
 8. What fraction of each library's fragments matched nothing in any search, and which of those lie in contigs or clusters found in more than one sample?
+9. Which unmatched sequences recur in more than one sample?
+10. Which clusters have no reference member and no named taxon, and in how many samples does each occur?
+11. Which sequences that matched nothing under an older reference release match under a newer one?
 
 Waiting on later catalog entries:
 
-9. Which species-level clusters predicted to infect Bacteroides occur in more than 10% of infants at month 3?
-10. What is the ratio of temperate to virulent genomes per sample, counting high-quality genomes only?
-11. Does the abundance of a phage follow that of its predicted host in the paired bacterial metagenome?
+12. Which species-level clusters predicted to infect Bacteroides occur in more than 10% of infants at month 3?
+13. What is the ratio of temperate to virulent genomes per sample, counting high-quality genomes only?
+14. Does the abundance of a phage follow that of its predicted host in the paired bacterial metagenome?
 
 ## Open decisions
 
@@ -285,3 +307,8 @@ None at present. The next step is to agree that scope and schema are settled.
 | 2026-11-20 | Independent reads record which end of the fragment they came from. | The reads can then be paired again later. |
 | 2026-11-20 | Read pair identifiers use the prefix `RP.` and the namespace `capsomer:`. | They must not be mistaken for GA4GH sequence digests. |
 | 2026-11-20 | The specification and the software are under the MIT licence. | It is short, permissive, and the licence Hecatomb uses. |
+| 2026-11-20 | Clusters may group sequences as well as genomes, across libraries. | Dark reads and contigs need grouping across samples, and the level is the researcher's choice. |
+| 2026-11-20 | Groups in catalogs of uncultivated viruses are taxa, and reference genomes can be cluster members. | "Seen before but unnamed" must differ from "never seen". |
+| 2026-11-20 | Missing bases raise a warning. | The bases are a dark sequence's only identity, but requiring them outright would exclude some datasets. |
+| 2026-11-20 | The sequence table names optional GC and complexity columns. | They separate low-complexity artifacts from unknown biology. |
+| 2026-11-20 | Hecatomb is an example, not a model the standard adheres to. | The standard must fit any pipeline. |
