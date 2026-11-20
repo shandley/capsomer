@@ -7,3 +7,4 @@ __pycache__/
 examples/*/bundle/
 examples/*/work/
 examples/*/*.log
+examples/*/tools/
