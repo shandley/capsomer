@@ -44,4 +44,4 @@ The design began from the data structure in [Hecatomb](https://github.com/shandl
 
 ## Licence
 
-Not yet chosen.
+MIT. See `LICENSE`.

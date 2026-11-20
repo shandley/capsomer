@@ -74,7 +74,7 @@ A label answers "what is this thing?" with a value from a vocabulary or a refere
 
 An optional column on `sequence` holds the digest of whichever strand sorts first. It helps software find reverse-complement pairs, and it is never used as a key.
 
-**Read pairs.** When a pipeline keeps both reads of a pair as one unit, the row holds both reads in two columns, each as sequenced. The identifier is the same hash taken over the first read, a comma, and the second read, with a prefix of its own so it cannot be mistaken for the digest of a single sequence. Two optional columns hold each read's plain digest, so a pair can be matched to the same read stored alone in another bundle.
+**Read pairs.** When a pipeline keeps both reads of a pair as one unit, the row holds both reads in two columns, each as sequenced. The identifier is the same hash taken over the first read, a comma, and the second read, with the prefix `RP.` in place of `SQ.` so it cannot be mistaken for the digest of a single sequence. Written in full, GA4GH identifiers carry the namespace `ga4gh:` and read pair identifiers carry `capsomer:`, so the two can never collide. Two optional columns hold each read's plain digest, so a pair can be matched to the same read stored alone in another bundle.
 
 **Genomes.** A genome identifier is derived from the identifiers of its member sequences, sorted and hashed. The same set of contigs is then the same genome in any bundle.
 
@@ -107,7 +107,7 @@ A valid bundle needs the tables marked required, at least one count table, and t
 
 | Table | One row is | Number columns |
 |---|---|---|
-| `read_count` | one read cluster in one library, in one read form | The count, and the read form it was counted in (see "Read clusters"). |
+| `read_count` | one read cluster in one library, in one read form | The count, the read form it was counted in, and for independent reads the end of the fragment they came from (see "Read clusters"). |
 | `coverage` | one contig in one library | fragments mapped, mean depth, fraction of the contig covered |
 
 ### Labels
@@ -168,12 +168,12 @@ Paired-end sequencing reads each fragment from both ends. Pipelines differ in wh
 | single | The library has one read per fragment. | one sequence |
 | first of pair | Used the first read and set the second aside. Hecatomb version 1 does this. | one sequence |
 | merged pair | Joined two overlapping reads into one longer sequence. | one sequence |
-| one of pair | Treated the two reads as independent. | one sequence per read |
+| one of pair | Treated the two reads as independent. | one sequence per read, with the end it came from (first or second) on the count row |
 | pair | Kept the two reads together, so two fragments match only if both reads match. | one row holding both reads |
 
-The first four forms are single sequences with ordinary identifiers. Only the pair form needs the two-read row described under "Identifiers". A pipeline that merges the pairs that overlap and keeps the rest as pairs writes both forms into the same tables.
+For independent reads, the same sequence seen as a first read and as a second read gets two count rows, so the reads can be paired again later. The first four forms are single sequences with ordinary identifiers. Only the pair form needs the two-read row described under "Identifiers". A pipeline that merges the pairs that overlap and keeps the rest as pairs writes both forms into the same tables.
 
-The container performs one merge of its own. Two clusters in the same library and the same read form whose stored sequences are identical, byte for byte, become one row with the counts added. This follows from naming a sequence by its content.
+The container performs one merge of its own. Two clusters in the same library, the same read form and the same end whose stored sequences are identical, byte for byte, become one row with the counts added. This follows from naming a sequence by its content.
 
 ## Sequences with no match
 
@@ -258,9 +258,7 @@ Waiting on later catalog entries:
 
 ## Open decisions
 
-1. The exact prefix for read pair identifiers.
-2. Whether a read counted in the "one of pair" form should record which end of the fragment it came from.
-3. The licence for the specification text and for the software that follows.
+None at present. The next step is to agree that scope and schema are settled.
 
 ## Decisions made
 
@@ -282,3 +280,6 @@ Waiting on later catalog entries:
 | 2026-11-20 | Sequences with no match are kept, and a search that found nothing writes a row. | Dark matter must be countable, and "searched and found nothing" must differ from "never searched". |
 | 2026-11-20 | Conformance checks carry three severity levels, after pointblank. | A shortfall in counts and a missing table are different kinds of failure. |
 | 2026-11-20 | Later tables are added in the order listed under "Later catalog entries". | Viral call and quality are the most widely produced; features and functions are the largest and most varied. |
+| 2026-11-20 | Independent reads record which end of the fragment they came from. | The reads can then be paired again later. |
+| 2026-11-20 | Read pair identifiers use the prefix `RP.` and the namespace `capsomer:`. | They must not be mistaken for GA4GH sequence digests. |
+| 2026-11-20 | The specification and the software are under the MIT licence. | It is short, permissive, and the licence Hecatomb uses. |
