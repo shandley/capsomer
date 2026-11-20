@@ -1,0 +1,128 @@
+Setup: one row per piece per classifier, with what is known about the piece.
+Count
+
+Genomes deposited after every tool's database date: share of pieces called viral, by novelty.
+tool          novelty            pieces  found
+jaeger        1 close to RefSeq  988     1.0  
+phabox2       1 close to RefSeq  988     0.996
+genomad       1 close to RefSeq  988     0.993
+virsorter2    1 close to RefSeq  988     0.945
+cenotetaker3  1 close to RefSeq  988     0.524
+jaeger        2 distant          183     0.962
+genomad       2 distant          183     0.94 
+phabox2       2 distant          183     0.929
+virsorter2    2 distant          183     0.907
+cenotetaker3  2 distant          183     0.678
+jaeger        3 very distant     351     0.858
+genomad       3 very distant     351     0.792
+virsorter2    3 very distant     351     0.781
+cenotetaker3  3 very distant     351     0.519
+phabox2       3 very distant     351     0.439
+
+The same, split into cultured phages and uncultivated genomes.
+tool          test_set             novelty            pieces  found
+jaeger        recent_cultured      1 close to RefSeq  828     1.0  
+genomad       recent_cultured      1 close to RefSeq  828     0.998
+phabox2       recent_cultured      1 close to RefSeq  828     0.996
+virsorter2    recent_cultured      1 close to RefSeq  828     0.987
+cenotetaker3  recent_cultured      1 close to RefSeq  828     0.467
+phabox2       recent_cultured      2 distant          37      0.973
+genomad       recent_cultured      2 distant          37      0.946
+jaeger        recent_cultured      2 distant          37      0.946
+virsorter2    recent_cultured      2 distant          37      0.919
+cenotetaker3  recent_cultured      2 distant          37      0.432
+jaeger        recent_cultured      3 very distant     27      1.0  
+genomad       recent_cultured      3 very distant     27      0.963
+virsorter2    recent_cultured      3 very distant     27      0.889
+phabox2       recent_cultured      3 very distant     27      0.667
+cenotetaker3  recent_cultured      3 very distant     27      0.296
+jaeger        recent_uncultivated  1 close to RefSeq  160     1.0  
+phabox2       recent_uncultivated  1 close to RefSeq  160     0.994
+genomad       recent_uncultivated  1 close to RefSeq  160     0.969
+cenotetaker3  recent_uncultivated  1 close to RefSeq  160     0.819
+virsorter2    recent_uncultivated  1 close to RefSeq  160     0.731
+jaeger        recent_uncultivated  2 distant          146     0.966
+genomad       recent_uncultivated  2 distant          146     0.938
+phabox2       recent_uncultivated  2 distant          146     0.918
+virsorter2    recent_uncultivated  2 distant          146     0.904
+cenotetaker3  recent_uncultivated  2 distant          146     0.74 
+jaeger        recent_uncultivated  3 very distant     324     0.846
+genomad       recent_uncultivated  3 very distant     324     0.778
+virsorter2    recent_uncultivated  3 very distant     324     0.772
+cenotetaker3  recent_uncultivated  3 very distant     324     0.537
+phabox2       recent_uncultivated  3 very distant     324     0.42 
+
+How many genomes and studies stand behind each set of pieces?
+test_set              pieces  genomes  studies
+earlier_uncultivated  582     381      122    
+non_viral             390     197      0      
+recent_cultured       892     300      143    
+recent_uncultivated   630     299      26     
+simulated_refseq      483     183      0      
+
+Very distant pieces of the recent set, by deposit. One deposit supplies most of them.
+deposit                     tool          pieces  found
+KCR (cucumber rhizosphere)  jaeger        247     0.822
+KCR (cucumber rhizosphere)  genomad       247     0.741
+KCR (cucumber rhizosphere)  virsorter2    247     0.737
+KCR (cucumber rhizosphere)  cenotetaker3  247     0.437
+KCR (cucumber rhizosphere)  phabox2       247     0.433
+WSV                         jaeger        61      0.934
+WSV                         cenotetaker3  61      0.934
+WSV                         genomad       61      0.918
+WSV                         virsorter2    61      0.902
+WSV                         phabox2       61      0.361
+cultured phages             jaeger        27      1.0  
+cultured phages             genomad       27      0.963
+cultured phages             virsorter2    27      0.889
+cultured phages             phabox2       27      0.667
+cultured phages             cenotetaker3  27      0.296
+other uncultivated          jaeger        16      0.875
+other uncultivated          virsorter2    16      0.813
+other uncultivated          genomad       16      0.813
+other uncultivated          cenotetaker3  16      0.563
+other uncultivated          phabox2       16      0.438
+
+A second set with many studies: uncultivated genomes deposited April to September 2026,
+at most 25 from one study. Share of pieces called viral, by novelty.
+tool          novelty            pieces  found
+jaeger        1 close to RefSeq  189     0.979
+genomad       1 close to RefSeq  189     0.974
+phabox2       1 close to RefSeq  189     0.905
+cenotetaker3  1 close to RefSeq  189     0.698
+virsorter2    1 close to RefSeq  189     0.153
+phabox2       2 distant          203     0.931
+jaeger        2 distant          203     0.857
+genomad       2 distant          203     0.847
+cenotetaker3  2 distant          203     0.626
+virsorter2    2 distant          203     0.453
+jaeger        3 very distant     190     0.853
+genomad       3 very distant     190     0.716
+virsorter2    3 very distant     190     0.521
+phabox2       3 very distant     190     0.411
+cenotetaker3  3 very distant     190     0.358
+
+In that set, studies with at least five very distant pieces: which of geNomad and Jaeger found more?
+studies  pieces  jaeger_ahead  genomad_ahead  tied  mean_genomad  mean_jaeger
+8        127     5             0              3     0.762         0.939      
+
+Known RefSeq viruses from the simulation.
+tool          pieces  found
+jaeger        483     0.992
+genomad       483     0.979
+phabox2       483     0.932
+virsorter2    483     0.872
+cenotetaker3  483     0.418
+
+Non-viral pieces called viral. A piece several tools call is probably a prophage,
+so calls a tool makes alone are the better estimate of its errors.
+tool          non_viral_pieces  called_viral  called_by_this_tool_alone  shared_with_three_or_more_tools
+cenotetaker3  390               9             1                          8                              
+genomad       390               18            1                          13                             
+jaeger        390               20            4                          13                             
+virsorter2    390               27            9                          13                             
+phabox2       390               82            67                         13                             
+
+Does running a second tool beside geNomad help on the very distant pieces?
+very_distant_pieces  genomad_alone  with_jaeger  with_phabox2  with_virsorter2  with_cenotetaker3  any_tool
+540                  0.765          0.891        0.848         0.844            0.807              0.948   

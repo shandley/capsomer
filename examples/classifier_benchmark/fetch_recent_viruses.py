@@ -57,14 +57,25 @@ def titles(accessions: list[str]) -> dict[str, str]:
     return found
 
 
+def study_key(title: str) -> str:
+    """A stand-in for the depositing study: the isolate name with digits removed.
+
+    Uncultivated genomes from one deposit share a naming scheme (KCR_vOTU_03142,
+    KCR_vOTU_00518), whatever taxon each one was given. Titles with no isolate
+    name fall back to the whole title with digits removed.
+    """
+    named = re.search(r"isolate (\S+)", title)
+    return re.sub(r"\d+", "N", named.group(1) if named else title)
+
+
 def capped(
     accessions: list[str], title: dict[str, str], limit: int, rng: random.Random
 ) -> list[str]:
-    """A random order of the accessions, keeping at most `limit` whose titles differ only in digits."""
+    """A random order of the accessions, keeping at most `limit` from one study."""
     kept: list[str] = []
     seen: dict[str, int] = {}
     for accession in rng.sample(accessions, len(accessions)):
-        study = re.sub(r"\d+", "N", title.get(accession, accession))
+        study = study_key(title.get(accession, accession))
         if seen.get(study, 0) < limit:
             seen[study] = seen.get(study, 0) + 1
             kept.append(accession)
@@ -75,6 +86,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("out", type=Path)
     parser.add_argument("--since", required=True, help="first deposit date, as YYYY/MM/DD")
+    parser.add_argument("--until", default="3000", help="last deposit date, as YYYY/MM/DD")
+    parser.add_argument("--sets", nargs="+", default=sorted(SETS), choices=sorted(SETS))
     parser.add_argument("--per-set", type=int, default=300)
     parser.add_argument("--min-length", type=int, default=5000)
     parser.add_argument("--max-length", type=int, default=500000)
@@ -89,11 +102,12 @@ def main() -> None:
         (args.out / "genomes.fasta").open("w") as fasta,
         (args.out / "genomes.tsv").open("w") as table,
     ):
-        table.write("accession\tset\ttitle\n")
-        for name, organisms in SETS.items():
+        table.write("accession\tset\tstudy\ttitle\n")
+        for name in args.sets:
+            organisms = SETS[name]
             term = (
                 f"({organisms}) AND {args.min_length}:{args.max_length}[SLEN] "
-                f'AND ("{args.since}"[PDAT] : "3000"[PDAT]) NOT srcdb_refseq[PROP]'
+                f'AND ("{args.since}"[PDAT] : "{args.until}"[PDAT]) NOT srcdb_refseq[PROP]'
             )
             found = sorted(identifiers(term))
             chosen = capped(found, titles(found), args.per_study, rng)[: args.per_set]
@@ -106,7 +120,7 @@ def main() -> None:
                 for record in text.split(">")[1:]:
                     header, _, body = record.partition("\n")
                     accession, _, title = header.partition(" ")
-                    table.write(f"{accession}\t{name}\t{title}\n")
+                    table.write(f"{accession}\t{name}\t{study_key(title)}\t{title}\n")
                     fasta.write(f">{accession}\n{body.replace(chr(10), '').upper()}\n")
 
 

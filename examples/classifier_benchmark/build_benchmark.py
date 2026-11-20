@@ -7,13 +7,16 @@ each piece. Scoring is then a query (see benchmark.sql).
 Usage: build_benchmark.py <work folder> <bundle folder>
 The work folder holds bench/ (simulated viruses and real non-viral pieces),
 recent_pieces/ and recent/ (genomes deposited after every tool's database
-date) and novelty/ (the similarity of the recent genomes to RefSeq viruses).
+date), earlier_pieces/ and earlier/ (uncultivated genomes from the six months
+before) and novelty/ (the similarity of those genomes to RefSeq viruses).
 """
 
 import csv
 import sys
 from collections import defaultdict
 from pathlib import Path
+
+from fetch_recent_viruses import study_key
 
 from capsomer.builder import Builder
 from capsomer.bundle import literal
@@ -27,7 +30,9 @@ TRUTH_COLUMNS = {
     "sequence_id": "The piece.",
     "run_id": "The run that cut the pieces.",
     "test_set": "simulated_refseq: a RefSeq virus used by ViroForge. recent_cultured and recent_uncultivated: "
-    "a viral genome deposited at NCBI after the database date of every classifier compared. non_viral: a real "
+    "a viral genome deposited at NCBI after the database date of every classifier compared. "
+    "earlier_uncultivated: an uncultivated viral genome deposited in the six months before that, after the "
+    "database date of every classifier but Jaeger, whose training date is not documented. non_viral: a real "
     "bacterial, archaeal, fungal or human fragment.",
     "is_viral": "True when the piece comes from a virus.",
     "origin": "viral, or the kind of non-viral sequence.",
@@ -37,7 +42,8 @@ TRUTH_COLUMNS = {
     "(e-value 1e-5 or better) to any RefSeq virus. Low values mean a virus unlike those in RefSeq.",
     "refseq_close_coverage": "Recent genomes only: the same fraction, counting only matches with at least "
     "50% amino acid identity.",
-    "study": "Recent genomes only: the naming pattern of the deposit, with digits removed.",
+    "study": "Recent genomes only: the isolate naming scheme of the deposit, with digits removed. "
+    "It stands in for the depositing study.",
 }
 
 
@@ -122,28 +128,37 @@ def main() -> None:
         for row in csv.DictReader(handle, delimiter="\t"):
             viral = row["origin"] == "viral"
             truth.append((row["name"], "simulated_refseq" if viral else "non_viral", viral, row["origin"], row["source"], row["has_family"] or None, None, None, None))  # fmt: skip
-    if (work / "recent_pieces" / "pieces.tsv").exists():
-        m8 = work / "novelty" / "recent_vs_refseq.m8"
-        pieces = work / "recent_pieces" / "pieces.tsv"
+    # Genomes deposited after the tools' database dates: (folder of genomes, folder of pieces,
+    # similarity search, label for the uncultivated ones).
+    recent_sets = (
+        ("recent", "recent_pieces", "recent_vs_refseq.m8", "recent_uncultivated"),
+        ("earlier", "earlier_pieces", "earlier_vs_refseq.m8", "earlier_uncultivated"),
+    )
+    for genomes, pieces_dir, search, uncultivated in recent_sets:
+        pieces = work / pieces_dir / "pieces.tsv"
+        if not pieces.exists():
+            continue
+        m8 = work / "novelty" / search
         coverage = piece_coverage(m8, pieces) if m8.exists() else {}
         close = piece_coverage(m8, pieces, 0.5) if m8.exists() else {}
         kinds: dict[str, tuple[str, str]] = {}
-        with (work / "recent" / "genomes.tsv").open() as handle:
+        with (work / genomes / "genomes.tsv").open() as handle:
             for row in csv.DictReader(handle, delimiter="\t"):
-                study = "".join("N" if c.isdigit() else c for c in row["title"])
-                kinds[row["accession"]] = (row["set"], study)
-        with (work / "recent_pieces" / "pieces.tsv").open() as handle:
+                kinds[row["accession"]] = (row["set"], study_key(row["title"]))
+        with pieces.open() as handle:
             for row in csv.DictReader(handle, delimiter="\t"):
                 group, study = kinds[row["source"]]
-                truth.append((row["name"], "recent_cultured" if group == "cultured_phage" else "recent_uncultivated", True, "viral", row["source"], None, coverage.get(row["name"]), close.get(row["name"]), study))  # fmt: skip
+                truth.append((row["name"], "recent_cultured" if group == "cultured_phage" else uncultivated, True, "viral", row["source"], None, coverage.get(row["name"]), close.get(row["name"]), study))  # fmt: skip
 
     with Builder(bundle) as b:
         b.add_run("pieces", tool="cut_pieces", step="other", description="Cut 5 kb pieces from sequences of known origin.", parameters={"piece_length": 5000})  # fmt: skip
         add_pieces(b, work / "bench" / "pieces.fasta", "pieces")
         add_tools(b, work / "bench" / "out", work / "bench" / "pieces.fasta", "known", versions)
-        if (work / "recent_pieces" / "pieces.fasta").exists():
-            add_pieces(b, work / "recent_pieces" / "pieces.fasta", "pieces")
-            add_tools(b, work / "recent_pieces" / "out", work / "recent_pieces" / "pieces.fasta", "recent", versions)  # fmt: skip
+        for label, pieces_dir in (("recent", "recent_pieces"), ("earlier", "earlier_pieces")):
+            fasta = work / pieces_dir / "pieces.fasta"
+            if fasta.exists():
+                add_pieces(b, fasta, "pieces")
+                add_tools(b, work / pieces_dir / "out", fasta, label, versions)
         b.con.execute(
             "CREATE OR REPLACE TEMP TABLE _truth (name VARCHAR, test_set VARCHAR, is_viral BOOLEAN, origin VARCHAR, "
             "source VARCHAR, has_family BOOLEAN, refseq_protein_coverage DOUBLE, refseq_close_coverage DOUBLE, study VARCHAR)"

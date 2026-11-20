@@ -1,0 +1,7 @@
+pieces of 10000 bases
+group	pieces	genomad	genomad_and_jaeger	genomad_or_jaeger	jaeger	phabox2
+known viruses	297	0.990	0.983	0.993	0.987	0.973
+not viral	193	0.041	0.031	0.057	0.047	0.244
+recent, close to RefSeq	619	1.000	1.000	1.000	1.000	0.998
+recent, distant	110	0.973	0.964	0.982	0.973	0.991
+recent, very distant	185	0.897	0.795	0.941	0.838	0.535

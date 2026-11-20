@@ -1,0 +1,7 @@
+pieces of 10000 bases
+group	pieces	genomad_default	genomad_relaxed	jaeger	genomad_default_or_jaeger	genomad_relaxed_or_jaeger
+known viruses	297	0.990	0.993	0.987	0.993	0.993
+not viral	193	0.041	0.093	0.047	0.057	0.109
+recent, close to RefSeq	619	1.000	1.000	1.000	1.000	1.000
+recent, distant	110	0.973	1.000	0.973	0.982	1.000
+recent, very distant	185	0.897	0.962	0.838	0.941	0.978

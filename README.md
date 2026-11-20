@@ -39,6 +39,7 @@ The name comes from the capsomer, the repeating protein unit from which a virus 
 - `src/capsomer/`: a Python library that loads the schema, computes sequence identifiers, writes tables, builds the manifest and checks a dataset against the standard.
 - `src/capsomer/importers/`: importers. Some add one tool's results to a dataset: contigs from any assembler, geNomad, Jaeger, VirSorter2, Cenote-Taker 3, PhaBOX2, CheckV, CheckM2, clusters from vclust or MMseqs2, CoverM coverage, read mappings (SAM or BAM), sequence alignments (PAF) and fastp read totals. Two build a whole dataset: one from Hecatomb version 1 results, and one from the ground truth of a [ViroForge](https://github.com/shandley/viroforge) synthetic dataset.
 - `examples/questions.sql`: test questions from the specification, written as SQL.
+- `docs/analysis-log.md`: a dated record of every analysis done while building the standard, with the data, method, result and limits of each.
 - `examples/classifier_benchmark/`: a comparison of five viral classifiers on sequences of known origin, including viral genomes made public after every tool's database was built. The scoring is done as queries on a Capsomer dataset.
 - `examples/viroforge_skin/`: a worked example. Two assemblers, geNomad, CheckV, two clustering tools and a read mapper were run on simulated reads, and their results were added to the simulation's ground truth, so every result can be checked against what is true.
 

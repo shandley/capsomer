@@ -14,11 +14,32 @@ FROM scored WHERE test_set LIKE 'recent%' GROUP BY ALL ORDER BY 2, 4 DESC;
 SELECT tool, test_set, novelty, count(*) AS pieces, round(avg(called_viral::INT), 3) AS found
 FROM scored WHERE test_set LIKE 'recent%' GROUP BY ALL ORDER BY 2, 3, 5 DESC;
 
--- Uncultivated genomes by study, since the study's own discovery tool is favoured.
-SELECT tool, left(study, 45) AS study, count(*) AS pieces, round(avg(called_viral::INT), 3) AS found
-FROM scored WHERE test_set = 'recent_uncultivated' AND study IN (
-  SELECT study FROM x_truth WHERE test_set = 'recent_uncultivated' GROUP BY 1 HAVING count(*) >= 60)
-GROUP BY ALL ORDER BY 2, 4 DESC;
+-- How many genomes and studies stand behind each set of pieces?
+SELECT test_set, count(*) AS pieces, count(DISTINCT source) AS genomes, count(DISTINCT study) AS studies
+FROM x_truth GROUP BY 1 ORDER BY 1;
+
+-- Very distant pieces of the recent set, by deposit. One deposit supplies most of them.
+SELECT CASE WHEN study LIKE 'KCR_vOTU%' THEN 'KCR (cucumber rhizosphere)' WHEN study LIKE 'WSV%' THEN 'WSV'
+  WHEN test_set = 'recent_cultured' THEN 'cultured phages' ELSE 'other uncultivated' END AS deposit,
+  tool, count(*) AS pieces, round(avg(called_viral::INT), 3) AS found
+FROM scored WHERE test_set LIKE 'recent%' AND novelty = '3 very distant' GROUP BY ALL ORDER BY 1, 4 DESC;
+
+-- A second set with many studies: uncultivated genomes deposited April to September 2026,
+-- at most 25 from one study. Share of pieces called viral, by novelty.
+SELECT tool, novelty, count(*) AS pieces, round(avg(called_viral::INT), 3) AS found
+FROM scored WHERE test_set = 'earlier_uncultivated' GROUP BY ALL ORDER BY 2, 4 DESC;
+
+-- In that set, studies with at least five very distant pieces: which of geNomad and Jaeger found more?
+WITH wide AS (SELECT sequence_id, any_value(study) AS study,
+    bool_or(called_viral) FILTER (WHERE tool = 'genomad') AS genomad,
+    bool_or(called_viral) FILTER (WHERE tool = 'jaeger') AS jaeger
+  FROM scored WHERE test_set = 'earlier_uncultivated' AND novelty = '3 very distant' GROUP BY 1),
+per_study AS (SELECT study, avg(genomad::INT) AS genomad, avg(jaeger::INT) AS jaeger, count(*) AS pieces
+  FROM wide GROUP BY 1 HAVING count(*) >= 5)
+SELECT count(*) AS studies, sum(pieces) AS pieces, count(*) FILTER (WHERE jaeger > genomad) AS jaeger_ahead,
+  count(*) FILTER (WHERE genomad > jaeger) AS genomad_ahead, count(*) FILTER (WHERE genomad = jaeger) AS tied,
+  round(avg(genomad), 3) AS mean_genomad, round(avg(jaeger), 3) AS mean_jaeger
+FROM per_study;
 
 -- Known RefSeq viruses from the simulation.
 SELECT tool, count(*) AS pieces, round(avg(called_viral::INT), 3) AS found
