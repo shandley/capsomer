@@ -64,7 +64,8 @@ WITH hits AS (
 halves AS (SELECT contig_id, right_half, family_name, count(*) AS n FROM hits GROUP BY ALL),
 top AS (SELECT contig_id, right_half, arg_max(family_name, n) AS family, sum(n) AS reads,
           max(n) / sum(n) AS share FROM halves GROUP BY 1, 2)
-SELECT s.name AS contig, s.length, l.family AS first_half_family, l.reads AS first_half_reads,
+SELECT (SELECT min(name) FROM sequence_source x WHERE x.sequence_id = s.sequence_id) AS contig,
+  s.length, l.family AS first_half_family, l.reads AS first_half_reads,
   r.family AS second_half_family, r.reads AS second_half_reads
 FROM top l JOIN top r ON l.contig_id = r.contig_id AND NOT l.right_half AND r.right_half
 JOIN sequence s ON s.sequence_id = l.contig_id

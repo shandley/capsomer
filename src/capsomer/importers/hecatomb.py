@@ -214,9 +214,8 @@ def import_hecatomb(
     if has_contigs:
         con.execute(
             "CREATE TABLE seq_contigs AS SELECT sequence_id, 'contig' AS kind, any_value(length) AS length, "
-            "any_value(bases) AS bases, any_value(gc) AS gc_content, min(name) AS name, "
-            f"'{PIPELINE}.assembly' AS run_id FROM ctg WHERE sequence_id IN (SELECT sequence_id FROM kept) "
-            "GROUP BY sequence_id"
+            "any_value(bases) AS bases, any_value(gc) AS gc_content "
+            "FROM ctg WHERE sequence_id IN (SELECT sequence_id FROM kept) GROUP BY sequence_id"
         )
     if has_contig_taxa:
         con.execute(
@@ -381,6 +380,12 @@ def import_hecatomb(
     if has_contigs:
         sequences += " UNION ALL BY NAME SELECT * FROM seq_contigs"
     write("sequence", sequences)
+    if has_contigs:
+        write(
+            "sequence_source",
+            f"SELECT DISTINCT sequence_id, '{PIPELINE}.assembly' AS run_id, name FROM ctg "
+            "WHERE sequence_id IN (SELECT sequence_id FROM kept)",
+        )
     write(
         "taxon",
         "SELECT t.* EXCLUDE (idx), b.genome_composition, b.baltimore_class FROM taxon_rows t "

@@ -1,4 +1,4 @@
-# Capsomer: a data standard for virome results (draft 3)
+# Capsomer: a data standard for virome results (draft 4)
 
 Status: draft, last revised 2026-11-20. A schema file and a first reference implementation exist in this repository. Where they differ from this document, this document is the intent and the difference is a bug.
 
@@ -35,7 +35,7 @@ A phyloseq object, the R structure widely used for 16S data, is one thing table 
 
 ### Columns each shape requires
 
-**Thing.** An identifier column named `<table>_id`, unique within the table. The other columns hold properties of the item itself. A thing that a run created, such as a contig or a cluster, also carries `run_id`.
+**Thing.** An identifier column named `<table>_id`, unique within the table. The other columns hold properties of the item itself. A thing that one run created, such as a cluster, also carries `run_id`. A sequence does not, because the same bases can come from several runs; `sequence_source` records each of them.
 
 **Count.** The identifier of the thing counted, `library_id`, `run_id`, and one or more number columns. There is one row per thing, per library, per run. A thing with no row for a library was not observed there. The manifest declares each number column: its unit, whether it is raw or normalized, and whether it may be summed.
 
@@ -85,7 +85,7 @@ An optional column on `sequence` holds the digest of whichever strand sorts firs
 
 ## Version 1 catalog
 
-The shapes make any table readable. The catalog makes common tables mean the same thing in every bundle, by fixing each table's name and columns. Version 1 covers what a phyloseq object holds, plus the links between reads, contigs, genomes and clusters.
+The shapes make any table readable. The catalog makes common tables mean the same thing in every bundle, by fixing each table's name and columns. Version 1 covers what a phyloseq object holds, the links between reads, contigs, genomes and clusters, and the viral calls and quality estimates that contig-based analysis starts from.
 
 A valid bundle needs the tables marked required, at least one count table, and the manifest. That is six tables: samples, libraries, runs, a reference release, taxa and one count table. Sequences are not required, so a profiler that reports only taxa per sample produces a valid bundle, and so does a pipeline that keeps every read and contig.
 
@@ -98,7 +98,7 @@ A valid bundle needs the tables marked required, at least one count table, and t
 | `run` (required) | one execution of one tool | Tool, version, the step it performed, and the pipeline run it belongs to. |
 | `reference_entry` | one database entry that something in the bundle matched | Its release, accession, description, length, molecule (nucleotide or protein) and taxon. |
 | `reference_release` (required) | one dated version of a database, taxonomy or catalog | Name, version, date, source, checksum, and kind: formal taxonomy, catalog of uncultivated viruses, or sequence database. |
-| `sequence` | one nucleotide sequence, or one read pair kept as a unit | Kind (read cluster, read pair cluster, contig or reference), length, the bases, and the name its producer gave it. A read pair has a second column of bases. Optional columns hold GC content and a complexity score, which help separate low-complexity artifacts from unknown biology. |
+| `sequence` | one nucleotide sequence, or one read pair kept as a unit | Kind (read cluster, read pair cluster, contig, reference, or a region cut from a longer sequence), length and the bases. A read pair has a second column of bases. Optional columns hold GC content and a complexity score, which help separate low-complexity artifacts from unknown biology. Names and producing runs are in `sequence_source`. |
 | `taxon` (required) | one taxon in one release | The release's own identifier, name, rank, parent taxon, genome composition (Baltimore class) and host category. A group in a catalog of uncultivated viruses is a taxon too, under that catalog's release. |
 | `genome` | one unit treated as a virus genome | Kind: single sequence, bin, or group of segments. |
 | `cluster` | one cluster of genomes or of sequences | Level (strain, species, genus, family, or a level the researcher defines) and the representative. A cluster needs no taxon name, so unclassified groups are first-class. |
@@ -119,6 +119,9 @@ A valid bundle needs the tables marked required, at least one count table, and t
 | Table | One row is | Value columns |
 |---|---|---|
 | `taxon_assignment` | one taxon given to one sequence, genome, cluster or original read, or the record that a search found none | The taxon, the search type and the rule (top hit, lowest common ancestor). Each step of a pipeline writes its own rows; the final answer is flagged as preferred. |
+| `sequence_source` | one sequence as one run produced it | The run, the name that run gave the sequence, and the depth an assembler reports for a contig. |
+| `viral_call` | one class given to one sequence by one run | Virus, plasmid, cellular or none, the run's score for each class, and the number of hallmark genes. |
+| `quality` | one quality assessment of one sequence or genome by one run | Completeness and contamination as fractions, the method, the tool's own tier, the MIUViG category, and terminal repeats. |
 | `run_parameter` | one setting of one run | Name, value, unit. Every threshold that decides which rows exist is listed here. |
 | `identifier_map` | one external identifier for one sample, library, sequence or genome | The authority that issued it and the identifier. |
 
@@ -131,6 +134,7 @@ A valid bundle needs the tables marked required, at least one count table, and t
 | `cluster_member` | one member of one cluster | The member is a genome or a sequence in the bundle, or a reference entry. A cluster with no reference member is novel with respect to that release. |
 | `sequence_relation` | one stated relation between two sequences | Reverse complement, rotation, or part of a longer sequence with its coordinates. |
 | `run_reference` | one reference release read by one run | |
+| `run_library` | one library read by one run | An assembly of one sample names one library; a co-assembly names several. |
 | `run_input` | one run taking its input from another | The selection applied, such as "sequences the earlier run called viral". |
 | `taxon_change` | one change to a taxon between two releases | Old taxon, new taxon, type of change. |
 
@@ -181,6 +185,19 @@ For independent reads, the same sequence seen as a first read and as a second re
 
 The container performs one merge of its own. Two clusters in the same library, the same read form and the same end whose stored sequences are identical, byte for byte, become one row with the counts added. This follows from naming a sequence by its content.
 
+## Contigs and viral genomes
+
+Most virome analysis works on contigs: assemble, decide which contigs are viral, estimate how complete each one is, group them into species-level clusters, and map reads back for abundance. The tables below hold each step, whatever tools perform it.
+
+- A contig is a `sequence` of kind contig. Its identifier comes from its bases, so the same contig assembled from two samples, or by two assemblers, is one row. `sequence_source` holds one row for each run that produced it, with that run's name for it, and `run_library` says which libraries each assembly read. Together they answer "which sample did this contig come from?".
+- `viral_call` holds each classifier's answer for each sequence it examined. A sequence the run examined and called neither virus nor plasmid has a row with the call `none` and keeps its scores, so a later reader can apply a different cutoff. The run's own cutoffs are in `run_parameter`.
+- `quality` holds completeness and contamination. Both are fractions; tools that report percentages are converted. Terminal repeats are recorded here because they are evidence of a complete genome.
+- A provirus is a stretch of a longer contig. It is stored as its own sequence of kind region, joined to the contig by a `sequence_relation` row with its coordinates. Calls and quality rows then always describe a whole sequence, and the contig keeps its own identifier (rule 2).
+- Species-level groups are `cluster` rows with the sequences as members. The identity and coverage cutoffs are settings of the clustering run, and a bundle can hold several clusterings at different levels.
+- Abundance is in `coverage`, usually for the cluster representatives. The mapping run states what it mapped to.
+
+Scores from different classifiers are not comparable. The manifest marks each score column as comparable within one run only.
+
 ## Searches
 
 Most taxonomy comes from sequence similarity searches, and pipelines chain several of them. A common pattern searches reads against viral proteins, checks the hits against proteins from all domains of life to remove false positives, and then repeats both steps against nucleotide databases for the reads still unplaced. Hecatomb works this way. The standard holds any such chain, in any order, with any tools.
@@ -220,6 +237,8 @@ The tables are designed to be joined. A result recorded at one level can be carr
 | a read | its read cluster | `read`, where kept |
 | a read cluster | the contig it maps to, and where on it | `alignment`, with coordinates on the contig |
 | a contig | its genome, its cluster | `genome_member`, `cluster_member` |
+| a contig | the runs that assembled it, and their libraries | `sequence_source`, `run_library` |
+| a provirus or other region | the contig it was cut from, and where | `sequence_relation` |
 | any of these | its taxon, from each step of each pipeline | `taxon_assignment` |
 | a hit | the database entry and that entry's taxon | `reference_entry` |
 
@@ -272,20 +291,20 @@ A result the catalog does not cover goes in a table whose name starts with `x_`.
 
 ## Later catalog entries
 
-None is specified yet. They will be added in this order.
+A table enters the catalog when real output of a widely used tool fills it. It stays provisional until the output of a second, independent tool fills it too. `viral_call` and `quality` entered on geNomad 1.13 and CheckV 1.1 output and are provisional: no second classifier or quality tool has been imported yet.
+
+The remaining entries are not specified. They will be added in this order.
 
 | Order | Table | Shape | Content |
 |---|---|---|---|
-| 1 | `viral_call` | label | virus, plasmid or cellular, for a sequence |
-| 1 | `quality` | label | completeness and contamination of a genome |
-| 2 | `host_prediction` | label or link | a host taxon, or a host genome held in the bundle |
-| 2 | `lifestyle` | label | temperate or virulent |
+| 1 | `host_prediction` | label or link | a host taxon, or a host genome held in the bundle |
+| 1 | `lifestyle` | label | temperate or virulent |
+| 2 | `feature` | thing | a gene or other interval on a sequence |
+| 2 | `function` | label | a protein family for a feature |
 | 3 | `origin_class` | label | infects the sampled host, infects its microbiota, passes through from diet or environment, or reagent contaminant |
-| 4 | `feature` | thing | a gene or other interval on a sequence |
-| 4 | `function` | label | a protein family for a feature |
 | on demand | `genome_similarity` | link | identity and aligned fraction for a pair of genomes |
 
-`origin_class` has no counterpart in any surveyed tool. Version 1 already holds its inputs: the host category on `taxon` and the control type on `sample`.
+Host prediction and lifestyle come first because most viromes are dominated by phage, and those two results are what phage analysis asks for after quality. `origin_class` has no counterpart in any surveyed tool. Version 1 already holds its inputs: the host category on `taxon` and the control type on `sample`.
 
 Within-host variation (variant sites and their frequencies) stays deferred. Strain-level profiles can identify individuals, and no consortium policy found in survey 03 addresses them.
 
@@ -329,12 +348,16 @@ Answerable with the version 1 catalog:
 12. Along one contig, which taxa do the aligned read clusters carry, by position?
 13. Which unmatched read clusters align to a contig that has a taxon?
 14. Which read clusters did one search step call viral and a later step reassign to a cellular taxon?
+15. How many high-quality viral genomes does each sample hold, and which species-level clusters do they belong to?
+16. Which contigs did a classifier score just below its cutoff, and how complete are they?
+17. Which contigs were assembled, byte for byte, from more than one sample or by more than one assembler?
+18. For each species-level cluster, how many reads map to its representative in each library?
 
 Waiting on later catalog entries:
 
-15. Which species-level clusters predicted to infect Bacteroides occur in more than 10% of infants at month 3?
-16. What is the ratio of temperate to virulent genomes per sample, counting high-quality genomes only?
-17. Does the abundance of a phage follow that of its predicted host in the paired bacterial metagenome?
+19. Which species-level clusters predicted to infect Bacteroides occur in more than 10% of infants at month 3?
+20. What is the ratio of temperate to virulent genomes per sample, counting high-quality genomes only?
+21. Does the abundance of a phage follow that of its predicted host in the paired bacterial metagenome?
 
 ## Open decisions
 
@@ -376,3 +399,10 @@ None at present. The next step is to agree that scope and schema are settled.
 | 2026-11-20 | The table of original reads, `read`, is in version 1 as an optional thing table. | When every read is mapped to contigs, it is the only route from a mapping position back to read-level taxonomy. |
 | 2026-11-20 | Sequences and taxon assignments are no longer required, and `taxon_profile` is a version 1 count table. | Many widely used tools report taxa per sample with no sequences. The standard must not assume a pipeline that keeps them. |
 | 2026-11-20 | A taxon can be assigned to an original read. | Classifiers that label every read, with no clustering, need a subject for their calls. |
+| 2026-11-20 | `viral_call` and `quality` join the catalog, drafted from real geNomad and CheckV output. | Contig-based analysis is how most viromes are studied, and both results are produced in almost every such analysis. |
+| 2026-11-20 | A sequence row names no run and carries no name. `sequence_source` holds one row per run that produced the sequence. | In the first test, MEGAHIT and metaSPAdes assembled two byte-identical contigs from one sample. One row with one run and one name could not record both. |
+| 2026-11-20 | `run_library` records which libraries each run read. | With one assembly per sample, it is the route from a contig to its sample. |
+| 2026-11-20 | A provirus is its own sequence of kind region, joined to its contig by `sequence_relation`. | An identifier must not depend on a prediction, and a call should describe a whole sequence. |
+| 2026-11-20 | A viral classifier that calls a sequence neither virus nor plasmid writes a row with call `none` and its scores. | "Examined and not called" must differ from "never examined", and the scores let a later reader choose another cutoff. |
+| 2026-11-20 | Completeness and contamination are stored as fractions. | Identity and coverage are already fractions, and one convention avoids errors of a factor of 100. |
+| 2026-11-20 | A table enters the catalog on real output of one tool and stays provisional until a second independent tool fills it. | It keeps the catalog from taking the shape of any one tool. |

@@ -42,6 +42,8 @@ enums:
       read_mapping: {}
       binning: {}
       genome_clustering: {}
+      viral_identification: {description: "A step that decides which sequences are viral."}
+      quality_assessment: {description: "A step that estimates completeness or contamination."}
       profiling: {description: "A step that reports taxa per library without reporting sequences."}
       simulation: {description: "Generation of synthetic data with known truth."}
       sequence_clustering: {}
@@ -63,6 +65,7 @@ enums:
       read_pair_cluster: {description: "The representative of a cluster of read pairs kept as units."}
       contig: {}
       reference: {description: "A reference sequence whose bases the bundle holds."}
+      region: {description: "A stretch cut from a longer sequence, such as a provirus."}
   GenomeKind:
     permissible_values:
       single_sequence: {}
@@ -109,6 +112,22 @@ enums:
       high: {}
       medium: {}
       low: {}
+  ViralClass:
+    permissible_values:
+      virus: {}
+      plasmid: {}
+      cellular: {description: "A chromosome of a cellular organism."}
+      none: {description: "The run examined the sequence and reported no class."}
+  TerminalRepeat:
+    permissible_values:
+      none: {description: "The run looked for terminal repeats and found none."}
+      direct: {description: "Direct terminal repeats, as in a circular genome assembled past its start."}
+      inverted: {description: "Inverted terminal repeats."}
+  MiuvigTier:
+    permissible_values:
+      finished: {}
+      high_quality: {description: "High-quality draft."}
+      genome_fragment: {}
   Strand:
     permissible_values:
       plus: {}
@@ -214,7 +233,9 @@ classes:
   Sequence:
     description: >-
       Nucleotide sequences: representatives of read clusters, contigs, and
-      reference sequences whose bases the bundle holds.
+      reference sequences whose bases the bundle holds. A sequence is its
+      bases, so one row can stand for contigs from several runs. The runs and
+      their names for it are in sequence_source.
     annotations: {shape: thing, row: "one nucleotide sequence, or one read pair kept as a unit"}
     attributes:
       sequence_id:
@@ -224,14 +245,12 @@ classes:
           GA4GH sequence digest of the bases as written, with prefix SQ. For a
           read pair, the same digest over both reads joined by a comma, with
           prefix RP.
-      kind: {range: SequenceKind, required: true, description: "What the sequence is."}
+      kind: {range: SequenceKind, required: true, description: "What the sequence is. If runs came by the same bases in different ways, the kind first recorded."}
       length: {range: integer, required: true, description: "Number of bases. For a read pair, of the first read.", annotations: {unit: bases}}
       bases: {description: "The bases, in upper case. For a read pair, the first read as sequenced."}
       mate_bases: {description: "For a read pair, the second read as sequenced."}
       first_read_digest: {description: "For a read pair, the SQ. digest of the first read alone."}
       second_read_digest: {description: "For a read pair, the SQ. digest of the second read alone."}
-      name: {description: "The name the producing run gave the sequence. Never a key."}
-      run_id: {range: Run, description: "The run that produced the sequence, for contigs."}
       gc_content: {range: float, description: "Fraction of bases that are G or C.", minimum_value: 0, maximum_value: 1}
       complexity: {range: float, description: "A sequence complexity score. The producing run states the method."}
 
@@ -391,6 +410,60 @@ classes:
       is_preferred: {range: boolean, description: "True for the final answer of the pipeline that produced the row."}
       detail: {description: "Tool-specific extras as a JSON string."}
 
+  SequenceSource:
+    description: >-
+      The runs that produced each sequence, and what each run called it. The
+      same bases can come from several runs, such as assemblies of two samples.
+    annotations: {shape: label, row: one sequence as one run produced it}
+    unique_keys:
+      primary:
+        unique_key_slots: [sequence_id, run_id, name]
+    attributes:
+      sequence_id: {range: Sequence, required: true, description: "The sequence."}
+      run_id: {range: Run, required: true, description: "The run that produced it."}
+      name: {required: true, description: "The name the run gave the sequence. Never a key."}
+      assembler_depth: {range: float, description: "Depth the assembler reports for a contig. The run states whether it is k-mer or read depth.", annotations: {unit: fold}}
+
+  ViralCall:
+    description: >-
+      Whether sequences are viral, according to each run that classified them.
+      A run that examined a sequence and called it neither virus nor plasmid
+      writes a row with call none, and keeps its scores.
+    annotations: {shape: label, row: one class given to one sequence by one run}
+    unique_keys:
+      primary:
+        unique_key_slots: [sequence_id, run_id]
+    attributes:
+      sequence_id: {range: Sequence, required: true, description: "The sequence classified."}
+      run_id: {range: Run, required: true, description: "The run that made the call. Its cutoffs are in run_parameter."}
+      call: {range: ViralClass, required: true, description: "The class the run reports for the sequence."}
+      virus_score: {range: float, description: "The run's score that the sequence is viral.", annotations: {comparable: within_run}}
+      plasmid_score: {range: float, description: "The run's score that the sequence is a plasmid.", annotations: {comparable: within_run}}
+      cellular_score: {range: float, description: "The run's score that the sequence is a cellular chromosome.", annotations: {comparable: within_run}}
+      n_hallmark_genes: {range: integer, description: "Genes on the sequence that the run treats as hallmarks of the class it called."}
+      is_preferred: {range: boolean, description: "True for the final answer of the pipeline that produced the row."}
+      detail: {description: "Tool-specific extras as a JSON string."}
+
+  Quality:
+    description: >-
+      Completeness and contamination of sequences or genomes, according to each
+      run that assessed them.
+    annotations:
+      shape: label
+      row: one quality assessment of one sequence or genome by one run
+      exactly_one: "sequence_id genome_id"
+    attributes:
+      sequence_id: {range: Sequence, description: "The sequence assessed, if the subject is a sequence."}
+      genome_id: {range: Genome, description: "The genome assessed, if the subject is a genome."}
+      run_id: {range: Run, required: true, description: "The run that made the assessment."}
+      completeness: {range: float, minimum_value: 0, description: "Estimated fraction of the genome that is present."}
+      completeness_method: {description: "How completeness was estimated, as the tool reports it."}
+      contamination: {range: float, minimum_value: 0, description: "Estimated fraction that does not belong to the genome. Tools that count repeated marker genes can report more than 1."}
+      tier: {description: "The quality tier, as the tool names it."}
+      miuvig_tier: {range: MiuvigTier, description: "The MIUViG quality category, if the tool reports one."}
+      terminal_repeat: {range: TerminalRepeat, description: "Terminal repeats found on the sequence. They are evidence of a complete genome."}
+      detail: {description: "Tool-specific extras as a JSON string."}
+
   RunParameter:
     description: Settings of runs. Every threshold that decides which rows exist is listed here.
     annotations: {shape: label, row: one setting of one run}
@@ -500,6 +573,18 @@ classes:
     attributes:
       run_id: {range: Run, required: true, description: "The run."}
       reference_release_id: {range: ReferenceRelease, required: true, description: "The release it read."}
+
+  RunLibrary:
+    description: >-
+      Which libraries each run read. An assembly of one sample names one
+      library, and a co-assembly names several.
+    annotations: {shape: link, row: one library read by one run}
+    unique_keys:
+      primary:
+        unique_key_slots: [run_id, library_id]
+    attributes:
+      run_id: {range: Run, required: true, description: "The run."}
+      library_id: {range: Library, required: true, description: "The library it read."}
 
   RunInput:
     description: Which runs fed which. This records the order of a search chain.

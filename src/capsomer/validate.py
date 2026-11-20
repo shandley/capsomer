@@ -21,6 +21,10 @@ from capsomer.schema import SHAPES, Table, load_catalog
 SEVERITIES = ("critical", "error", "warning")
 COUNT_TABLES = ("read_count", "coverage", "taxon_profile")
 DIGEST_SAMPLE = 2000
+PREFERRED = {
+    "taxon_assignment": ("sequence_id", "genome_id", "cluster_id", "read_id"),
+    "viral_call": ("sequence_id",),
+}
 
 
 @dataclass(frozen=True)
@@ -240,27 +244,31 @@ class _Checker:
             "(outcome = 'none' AND taxon_id IS NOT NULL) OR (outcome = 'assigned' AND taxon_id IS NULL)",
             "Outcome and taxon disagree: none must have no taxon, assigned must have one.",
         )
-        if not self.has(name, "is_preferred") or not self.has("run", "run_id", "parent_run_id"):
+
+    def preferred(self) -> None:
+        """A thing has at most one preferred row per pipeline, in each table that flags one."""
+        if not self.has("run", "run_id", "parent_run_id"):
             return
-        kinds = [
-            c for c in ("sequence_id", "genome_id", "cluster_id", "read_id") if self.has(name, c)
-        ]
-        subject = "coalesce(" + ", ".join(f"'{c}:' || {c}" for c in kinds) + ")"
-        rows = self.count(
-            "WITH RECURSIVE up(run_id, root) AS ("
-            " SELECT run_id, run_id FROM run WHERE parent_run_id IS NULL"
-            " UNION ALL SELECT r.run_id, up.root FROM run r JOIN up ON r.parent_run_id = up.run_id) "
-            f"SELECT count(*) FROM (SELECT {subject} AS subject, root FROM {name} t "
-            "JOIN up USING (run_id) WHERE is_preferred GROUP BY 1, 2 HAVING count(*) > 1)"
-        )
-        if rows:
-            self.add(
-                "error",
-                "one_preferred",
-                name,
-                "A thing has two preferred rows from one pipeline.",
-                rows,
+        for name, subjects in PREFERRED.items():
+            if not self.has(name, "is_preferred", "run_id"):
+                continue
+            kinds = [c for c in subjects if self.has(name, c)]
+            subject = "coalesce(" + ", ".join(f"'{c}:' || {c}" for c in kinds) + ")"
+            rows = self.count(
+                "WITH RECURSIVE up(run_id, root) AS ("
+                " SELECT run_id, run_id FROM run WHERE parent_run_id IS NULL"
+                " UNION ALL SELECT r.run_id, up.root FROM run r JOIN up ON r.parent_run_id = up.run_id) "
+                f"SELECT count(*) FROM (SELECT {subject} AS subject, root FROM {name} t "
+                "JOIN up USING (run_id) WHERE is_preferred GROUP BY 1, 2 HAVING count(*) > 1)"
             )
+            if rows:
+                self.add(
+                    "error",
+                    "one_preferred",
+                    name,
+                    "A thing has two preferred rows from one pipeline.",
+                    rows,
+                )
 
     def alignment(self) -> None:
         for side in ("query", "target"):
@@ -374,6 +382,7 @@ class _Checker:
             if table and self.columns_present(table):
                 self.rows(table)
         self.taxon_assignment()
+        self.preferred()
         self.alignment()
         self.read_totals()
         self.digests()

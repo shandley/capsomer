@@ -310,12 +310,17 @@ def import_viroforge(dataset_dir: Path, out_dir: Path, *, sample_id: str | None 
     )
 
     # ---- sequences, genomes, external identifiers
-    # Records with identical bases are one sequence. The simulator's names for it stay in x_sequence_origin.
+    # Records with identical bases are one sequence. Each of the simulator's names for it is a sequence_source row.
     write(
         "sequence",
         "SELECT sequence_id, 'reference' AS kind, any_value(length) AS length, any_value(bases) AS bases, "
-        "any_value(gc_content) AS gc_content, min(name) AS name FROM seq GROUP BY sequence_id",
+        "any_value(gc_content) AS gc_content FROM seq GROUP BY sequence_id",
     )
+    write(
+        "sequence_source",
+        f"SELECT DISTINCT sequence_id, {literal(RUN)} AS run_id, name FROM seq",
+    )
+    write("run_library", values([(RUN, sample)], ("run_id", "library_id")))
     genomes = [(ids.genome_id([seq_id]), seq_id, name) for name, seq_id in by_genome.items()]
     con.execute("CREATE TABLE gen (genome_id VARCHAR, sequence_id VARCHAR, name VARCHAR)")
     con.executemany("INSERT INTO gen VALUES (?, ?, ?)", genomes)

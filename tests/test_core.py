@@ -34,7 +34,7 @@ def test_genome_id_ignores_member_order() -> None:
 
 def test_catalog_shapes_and_references() -> None:
     catalog = load_catalog()
-    assert len(catalog.tables) == 23
+    assert len(catalog.tables) == 27
     required = {t.name for t in catalog.tables.values() if t.catalog_required}
     assert required == {"sample", "library", "run", "reference_release", "taxon"}
     for table in catalog.tables.values():
