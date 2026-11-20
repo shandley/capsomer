@@ -370,3 +370,84 @@ def test_checkm2_quality_describes_genomes(
         (ids.genome_id([ids.sequence_id(SEQ["b"])]), "single_sequence", 1, None, 0.4, 0.005, "Gradient Boost (General Model)"),
     ]  # fmt: skip
     assert con.execute("SELECT count(*) FROM genome_member WHERE genome_id = ?", [two]).fetchall() == [(2,)]  # fmt: skip
+
+
+def test_genomad_run_without_provirus_search_is_read(
+    tmp_path: Path, bundle: Path, tools: dict[str, Path]
+) -> None:
+    import shutil
+
+    partial = tmp_path / "genomad_no_provirus"
+    shutil.copytree(tools["genomad"], partial)
+    shutil.rmtree(partial / "x_find_proviruses")
+    (partial / "x_summary" / "x_virus_summary.tsv").write_text(
+        "\n".join(
+            line
+            for line in (partial / "x_summary" / "x_virus_summary.tsv").read_text().splitlines()
+            if "provirus" not in line
+        )
+        + "\n"
+    )
+    with Builder(bundle) as b:
+        added = add_genomad(b, partial, tools["first"], run_id="genomad2")
+    assert added["viral_call"] == 3
+
+
+def test_three_more_classifiers_fill_viral_call(
+    tmp_path: Path, bundle: Path, tools: dict[str, Path]
+) -> None:
+    """Headers copied from Cenote-Taker 3.4.4, PhaBOX 2.2 and Jaeger 1.26.5 output. Values are made up."""
+    from capsomer.importers.classifiers import add_cenotetaker3, add_jaeger, add_phabox2
+
+    ct3 = tmp_path / "ct3"
+    tsv(
+        ct3 / "ct3_virus_summary.tsv",
+        "contig input_name organism virus_seq_length end_feature gene_count virion_hallmark_count "
+        "rep_hallmark_count RDRP_hallmark_count virion_hallmark_genes rep_hallmark_genes RDRP_hallmark_genes "
+        "taxonomy_hierarchy ORF_caller gcode avg_read_depth",
+        "ct3_1 k141_1 Birpovirus~sp. 60 DTR 6 2 1 0 a b c d prodigal-gv 11 NaN",
+    )
+    tsv(
+        ct3 / "ct3_prune_summary.tsv",
+        "contig contig_length chunk_length chunk_name chunk_start chunk_stop",
+        "ct3_1 60 60 NaN 0 60",
+    )
+    phabox = tsv(
+        tmp_path / "phabox" / "final_prediction" / "phamer_prediction.tsv",
+        "Accession Length Pred Proportion PhaMerScore PhaMerConfidence",
+        "k141_1 60 virus 0.83 1.0 high-confidence",
+        "k141_2 80 non-virus 0.1 0.2 lower~than~reject~threshold",
+    )
+    jaeger = tsv(
+        tmp_path / "jaeger.tsv",
+        "contig_id length prediction entropy energy reliability_score bacteria_score phage_score "
+        "eukarya_score archaea_score plasmid_score virus_score",
+        "k141_1 60 phage 0.0 -0.8 0.99 0.02 0.91 0.01 0.02 0.02 0.02",
+        "k141_2 80 bacteria 0.1 -0.7 0.90 0.85 0.05 0.03 0.03 0.02 0.02",
+        "k141_3 50 plasmid 0.1 -0.7 0.80 0.10 0.05 0.03 0.02 0.78 0.02",
+    )
+    with Builder(bundle) as b:
+        add_cenotetaker3(b, ct3, tools["first"], run_id="ct3")
+        add_phabox2(b, phabox.parent.parent, tools["first"], run_id="phabox")
+        add_jaeger(b, jaeger, tools["first"], run_id="jaeger")
+    assert conforms(validate(bundle))
+    con = connect(bundle)
+    calls = con.execute(
+        "SELECT v.run_id, s.name, v.call, v.virus_score, v.plasmid_score, v.cellular_score, v.n_hallmark_genes "
+        "FROM viral_call v JOIN sequence_source s USING (sequence_id) "
+        "WHERE s.run_id = 'asm1' AND v.run_id IN ('ct3', 'phabox', 'jaeger') ORDER BY 1, 2"
+    ).fetchall()
+    assert calls == [
+        ("ct3", "k141_1", "virus", None, None, None, 3),
+        ("ct3", "k141_2", "none", None, None, None, None),
+        ("ct3", "k141_3", "none", None, None, None, None),
+        ("jaeger", "k141_1", "virus", 0.91, 0.02, 0.02, None),
+        ("jaeger", "k141_2", "cellular", 0.05, 0.02, 0.85, None),
+        ("jaeger", "k141_3", "plasmid", 0.05, 0.78, 0.1, None),
+        ("phabox", "k141_1", "virus", 1.0, None, None, None),
+        ("phabox", "k141_2", "none", 0.2, None, None, None),
+        ("phabox", "k141_3", "none", None, None, None, None),
+    ]
+    assert con.execute("SELECT terminal_repeat FROM quality WHERE run_id = 'ct3'").fetchall() == [
+        ("direct",)
+    ]

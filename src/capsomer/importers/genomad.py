@@ -12,7 +12,7 @@ from typing import Any, cast
 
 from capsomer import ids
 from capsomer.builder import Builder
-from capsomer.bundle import literal
+from capsomer.bundle import literal, quote
 from capsomer.importers.common import load_fasta, tsv
 
 RANKS = ("domain", "realm", "kingdom", "phylum", "class", "order", "family", "genus", "species")
@@ -38,7 +38,7 @@ def _find(folder: Path, pattern: str) -> Path | None:
 def _read(builder: Builder, name: str, path: Path | None, columns: Sequence[str]) -> None:
     """A temp table from a geNomad file, or an empty one with the given columns."""
     if path is None:
-        spec = ", ".join(f"{c} VARCHAR" for c in columns)
+        spec = ", ".join(f"{quote(c)} VARCHAR" for c in columns)
         builder.con.execute(f"CREATE OR REPLACE TEMP TABLE {name} ({spec})")
     else:
         builder.con.execute(f"CREATE OR REPLACE TEMP TABLE {name} AS SELECT * FROM {tsv(path)}")

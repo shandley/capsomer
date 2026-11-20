@@ -10,6 +10,7 @@ from capsomer.builder import Builder
 from capsomer.bundle import run_sql
 from capsomer.importers.checkm2 import add_checkm2
 from capsomer.importers.checkv import add_checkv
+from capsomer.importers.classifiers import add_cenotetaker3, add_jaeger, add_phabox2
 from capsomer.importers.clusters import LAYOUTS, add_clusters
 from capsomer.importers.contigs import add_contigs
 from capsomer.importers.genomad import add_genomad
@@ -82,6 +83,16 @@ def _add_parser(commands: Any) -> None:
         "--preferred", action="store_true", help="mark as the pipeline's answer"
     )
 
+    for name, what, source in (
+        ("cenotetaker3", "Cenote-Taker 3 viral calls", "Cenote-Taker 3 output folder"),
+        ("phabox2", "PhaBOX2 (PhaMer) viral calls", "PhaBOX2 output folder"),
+        ("jaeger", "Jaeger viral calls", "Jaeger per-sequence table (.tsv)"),
+    ):
+        classifier = tool(name, what)
+        classifier.add_argument("results", type=Path, help=source)
+        classifier.add_argument("fasta", type=Path, help="the FASTA file the tool was given")
+        settings(classifier)
+
     checkm2 = tool("checkm2", "CheckM2 completeness and contamination of genomes")
     checkm2.add_argument("report", type=Path, help="CheckM2 quality_report.tsv")
     checkm2.add_argument(
@@ -148,6 +159,18 @@ def _add(args: argparse.Namespace) -> None:
                 builder, args.results, args.fasta, tool_version=args.tool_version,
                 database_version=args.database_version, preferred=args.preferred,
                 run_id=run_id, parent=parent, inputs=inputs,
+            ),
+            "cenotetaker3": lambda: add_cenotetaker3(
+                builder, args.results, args.fasta, tool_version=args.tool_version,
+                parameters=_pairs(args.parameter), run_id=run_id, parent=parent, inputs=inputs,
+            ),
+            "phabox2": lambda: add_phabox2(
+                builder, args.results, args.fasta, tool_version=args.tool_version,
+                parameters=_pairs(args.parameter), run_id=run_id, parent=parent, inputs=inputs,
+            ),
+            "jaeger": lambda: add_jaeger(
+                builder, args.results, args.fasta, tool_version=args.tool_version,
+                parameters=_pairs(args.parameter), run_id=run_id, parent=parent, inputs=inputs,
             ),
             "checkm2": lambda: add_checkm2(
                 builder, args.report, args.genomes, extension=args.extension,
