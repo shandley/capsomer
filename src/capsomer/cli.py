@@ -4,6 +4,7 @@ import argparse
 import sys
 from pathlib import Path
 
+from capsomer.bundle import run_sql
 from capsomer.importers.hecatomb import import_hecatomb
 from capsomer.validate import conforms, format_report, validate
 
@@ -26,7 +27,15 @@ def main(argv: list[str] | None = None) -> int:
     hecatomb.add_argument("--sample-id-column", default="sampleID")
     hecatomb.add_argument("--title")
 
+    sql = commands.add_parser("sql", help="run SQL against a bundle")
+    sql.add_argument("bundle", type=Path)
+    sql.add_argument("statement", nargs="?", help="SQL to run")
+    sql.add_argument("--file", type=Path, help="file of SQL statements to run instead")
+
     args = parser.parse_args(argv)
+    if args.command == "sql":
+        print(run_sql(args.bundle, args.file.read_text() if args.file else args.statement))
+        return 0
     if args.command == "import-hecatomb":
         summary = import_hecatomb(
             args.results,

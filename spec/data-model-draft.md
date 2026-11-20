@@ -1,6 +1,6 @@
 # Capsomer: a data standard for virome results (draft 3)
 
-Status: design under discussion, last revised 2026-11-20. No schema files or software exist yet.
+Status: draft, last revised 2026-11-20. A schema file and a first reference implementation exist in this repository. Where they differ from this document, this document is the intent and the difference is a bug.
 
 A capsomer is the repeating protein unit from which a virus capsid is built. The standard is named for it because every table in a dataset is one of four repeating shapes.
 
@@ -204,7 +204,7 @@ Other types, such as k-mer classification with no alignment, are declared by the
 
 ### Which hits are kept
 
-The standard applies no filter of its own. The producer decides what to store and declares it in `run_parameter`: the limits the search itself applied (its e-value ceiling, its maximum hits per query) and whether the bundle holds every reported hit or only the best. "Found nothing" then has a precise meaning: nothing under that ceiling. A search run that does not declare this raises a warning.
+The standard applies no filter of its own. The producer decides what to store and declares it in `run_parameter`: the limits the search itself applied (its e-value ceiling, its maximum hits per query) and whether the bundle holds every reported hit or only the best. "Found nothing" then has a precise meaning: nothing under that ceiling. The declaration uses the setting name `hits_kept`. A search run without it raises a warning.
 
 Keeping weak hits matters. A low-identity hit with a poor e-value can be the only trace of an unknown virus, and a filter applied before storage removes it for every later reader.
 

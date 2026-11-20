@@ -58,6 +58,46 @@ def write_table(
     return int(count[0]) if count else 0
 
 
+def connect(bundle_dir: Path) -> duckdb.DuckDBPyConnection:
+    """Open a bundle for querying: one view per table, named after the table."""
+    con = duckdb.connect()
+    for path in sorted(bundle_dir.glob("*.parquet")):
+        scan = f"read_parquet({literal(str(path))})"
+        con.execute(f"CREATE VIEW {quote(path.stem)} AS SELECT * FROM {scan}")
+    return con
+
+
+def run_sql(bundle_dir: Path, sql: str, max_rows: int = 40) -> str:
+    """Run one or more statements against a bundle and return the results as text.
+
+    Statements are separated by a semicolon at the end of a line. Comment lines
+    that precede a statement are printed above its result.
+    """
+    con = connect(bundle_dir)
+    blocks: list[str] = []
+    for statement in (s.strip() for s in sql.split(";\n")):
+        lines = statement.rstrip(";").splitlines()
+        comments = [line[2:].strip() for line in lines if line.startswith("--")]
+        body = "\n".join(line for line in lines if not line.startswith("--")).strip()
+        if not body:
+            continue
+        result = con.execute(body)
+        out = list(comments)
+        if result.description:
+            header = [str(d[0]) for d in result.description]
+            rows = [
+                [("" if v is None else str(v)) for v in row] for row in result.fetchmany(max_rows)
+            ]
+            widths = [
+                max(len(h), *(len(r[i]) for r in rows)) if rows else len(h)
+                for i, h in enumerate(header)
+            ]
+            out.append("  ".join(h.ljust(w) for h, w in zip(header, widths, strict=True)))
+            out += ["  ".join(v.ljust(w) for v, w in zip(r, widths, strict=True)) for r in rows]
+        blocks.append("\n".join(out))
+    return "\n\n".join(blocks)
+
+
 def _column_entry(
     con: duckdb.DuckDBPyConnection, scan: str, name: str, sql_type: str, table: Table | None
 ) -> dict[str, Any]:

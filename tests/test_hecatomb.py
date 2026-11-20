@@ -161,3 +161,15 @@ def test_import_conforms_and_connects(tmp_path: Path) -> None:
         one("SELECT query_strand FROM alignment WHERE search_type LIKE 'translated%' LIMIT 1")
         == "minus"
     )
+
+
+def test_example_questions_run(tmp_path: Path) -> None:
+    from capsomer.bundle import run_sql
+
+    results = make_results(tmp_path / "results")
+    bundle = tmp_path / "example" / "bundle"
+    import_hecatomb(results, bundle)
+    questions = Path(__file__).parents[1] / "examples" / "questions.sql"
+    report = run_sql(bundle, questions.read_text())
+    assert "Question 12" in report
+    assert "unmatched_on_a_contig" in report
