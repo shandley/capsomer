@@ -181,8 +181,10 @@ Sequences that match nothing in any database, often called dark matter, are kept
 
 - A sequence needs no label to exist. A read cluster or contig that matched nothing still has its `sequence` row and its counts.
 - A search that found nothing is recorded. `taxon_assignment` holds a row with no taxon and `outcome` set to `none`, so the unmatched set of each run is explicit.
-- A cluster needs no taxon name. An unmatched genome found in forty samples is one `cluster` row with forty counts, and it can be followed across studies by its sequence identifiers.
+- A cluster needs no taxon name. Within one study, an unmatched genome found in forty samples is one `cluster` row with forty counts.
 - Omissions are visible. If a pipeline leaves unmatched reads out of the bundle, its counts fall short of the library total, and the shortfall is the number of fragments left out.
+
+Across studies the design does less. An identifier matches only a byte-identical sequence, and the same unknown genome assembled in two studies will usually differ by a few bases, by strand or by start position. Recognising it in both takes a comparison step: clustering the genomes of the combined bundles, or assigning each study's genomes to a shared catalog. A bundle keeps what that step needs, but it does not perform it.
 
 How dark a sequence is stays a question for the analyst. No match at all, a match only to a distant protein, and an assignment no deeper than "Viruses" are all recoverable from `taxon_assignment`, `alignment` and the rank in `taxon`. The standard fixes no threshold between them.
 
