@@ -39,7 +39,7 @@ A phyloseq object, the R structure widely used for 16S data, is one thing table 
 
 **Count.** The identifier of the thing counted, `library_id`, `run_id`, and one or more number columns. There is one row per thing, per library, per run. A thing with no row for a library was not observed there. The manifest declares each number column: its unit, whether it is raw or normalized, and whether it may be summed.
 
-**Label.** The identifier of the thing described, `run_id`, and one or more value columns. A value can be a term, a number, or the identifier of a reference item such as a taxon. Two runs that disagree produce two rows. Five optional columns have the same meaning in every label table: `score`, `score_type`, `confidence`, `is_preferred` (the run's own choice when it gives several answers) and `detail` (tool-specific extras as a JSON string).
+**Label.** The identifier of the thing described, `run_id`, and one or more value columns. A value can be a term, a number, or the identifier of a reference item such as a taxon. Two runs that disagree produce two rows. Five optional columns have the same meaning in every label table: `score`, `score_type`, `confidence`, `is_preferred` (the final answer of the pipeline that produced the row, at most one per thing per pipeline) and `detail` (tool-specific extras as a JSON string).
 
 A label table also records the absence of an answer. A run that examined a thing and reached no answer writes a row with the value empty and the `outcome` column set to `none`. A thing with no row was not examined by that run. Without this, "searched and found nothing" cannot be told apart from "never searched".
 
@@ -63,6 +63,7 @@ A label answers "what is this thing?" with a value from a vocabulary or a refere
 5. Read-level and assembly-level results use the same tables. A read cluster and a contig are both sequences, and both can carry labels and counts.
 6. The standard describes an analysis and does not prescribe one. Clustering levels, identity cutoffs, quality filters and tool choices belong to the researcher. The standard requires that they are recorded, never that they take a particular value.
 7. The container does not merge what the analysis kept apart. The one exception is stated under "Read clusters".
+8. Every result can be followed to the things it came from. A read, the contig it maps to, the genome that contig belongs to and the taxon each was given are joined by identifiers, so information recorded at one level can be used at another.
 
 ## Identifiers
 
@@ -94,7 +95,8 @@ A valid bundle needs the tables marked required, at least one count table, and t
 |---|---|---|
 | `sample` (required) | a sample | Control type is required. MIxS terms (the Genomic Standards Consortium's sample vocabulary) where they exist. |
 | `library` (required) | a sequencing library | Its sample, nucleic acid type, enrichment, amplification, whether it is stranded, single or paired layout, and read and fragment totals before and after quality control. |
-| `run` (required) | one execution of one tool | Tool, version, and the step it performed. |
+| `run` (required) | one execution of one tool | Tool, version, the step it performed, and the pipeline run it belongs to. |
+| `reference_entry` | one database entry that something in the bundle matched | Its release, accession, description, length, molecule (nucleotide or protein) and taxon. |
 | `reference_release` (required) | one dated version of a database, taxonomy or catalog | Name, version, date, source, checksum, and kind: formal taxonomy, catalog of uncultivated viruses, or sequence database. |
 | `sequence` (required) | one nucleotide sequence, or one read pair kept as a unit | Kind (read cluster, read pair cluster, contig or reference), length, the bases, and the name its producer gave it. A read pair has a second column of bases. Optional columns hold GC content and a complexity score, which help separate low-complexity artifacts from unknown biology. |
 | `taxon` (required) | one taxon in one release | The release's own identifier, name, rank, parent taxon, genome composition (Baltimore class) and host category. A group in a catalog of uncultivated viruses is a taxon too, under that catalog's release. |
@@ -114,7 +116,7 @@ A valid bundle needs the tables marked required, at least one count table, and t
 
 | Table | One row is | Value columns |
 |---|---|---|
-| `taxon_assignment` (required) | one taxon given to one sequence, genome or cluster, or the record that a search found none | The taxon, the search type (nucleotide or translated) and the rule (top hit, lowest common ancestor). |
+| `taxon_assignment` (required) | one taxon given to one sequence, genome or cluster, or the record that a search found none | The taxon, the search type and the rule (top hit, lowest common ancestor). Each step of a pipeline writes its own rows; the final answer is flagged as preferred. |
 | `run_parameter` | one setting of one run | Name, value, unit. Every threshold that decides which rows exist is listed here. |
 | `identifier_map` | one external identifier for one sample, library, sequence or genome | The authority that issued it and the identifier. |
 
@@ -122,14 +124,15 @@ A valid bundle needs the tables marked required, at least one count table, and t
 
 | Table | One row is | Pair columns |
 |---|---|---|
-| `alignment` | one alignment of one sequence to another | Coordinates (1-based, inclusive), identity, length, e-value, bit score, nucleotide or translated search, and a flag for the primary alignment. For a read pair, which of the two reads aligned. |
+| `alignment` | one alignment of one sequence to another sequence or to a reference entry | The search type, coordinates on each side (1-based, inclusive, in that side's own units), reading frame for translated searches, identity, length, e-value, bit score, and a flag for the primary alignment. For a read pair, which of the two reads aligned. |
 | `genome_member` | one sequence in one genome | Segment label where relevant. |
-| `cluster_member` | one member of one cluster | The member is a genome or a sequence in the bundle, or a reference genome given by accession and release. A cluster with no reference member is novel with respect to that release. |
+| `cluster_member` | one member of one cluster | The member is a genome or a sequence in the bundle, or a reference entry. A cluster with no reference member is novel with respect to that release. |
 | `sequence_relation` | one stated relation between two sequences | Reverse complement, rotation, or part of a longer sequence with its coordinates. |
 | `run_reference` | one reference release read by one run | |
+| `run_input` | one run taking its input from another | The selection applied, such as "sequences the earlier run called viral". |
 | `taxon_change` | one change to a taxon between two releases | Old taxon, new taxon, type of change. |
 
-`alignment` ties read-based and contig-based analysis together. A read cluster with only a distant translated hit and no alignment to a contig is the low-identity, unassembled signal that assembly-only catalogs drop. When the target of an alignment is a database entry the bundle does not hold, the row gives the entry's accession and its reference release in place of a sequence identifier.
+`alignment` ties read-based and contig-based analysis together. A read cluster with only a distant translated hit and no alignment to a contig is the low-identity, unassembled signal that assembly-only catalogs drop.
 
 `taxon_change` makes re-annotation a join. The need is real: the 2022 ICTV release removed the three tailed-phage families that held 1,921 species, and the 2024 release renamed 2,884 species (survey 02).
 
@@ -175,6 +178,56 @@ Paired-end sequencing reads each fragment from both ends. Pipelines differ in wh
 For independent reads, the same sequence seen as a first read and as a second read gets two count rows, so the reads can be paired again later. The first four forms are single sequences with ordinary identifiers. Only the pair form needs the two-read row described under "Identifiers". A pipeline that merges the pairs that overlap and keeps the rest as pairs writes both forms into the same tables.
 
 The container performs one merge of its own. Two clusters in the same library, the same read form and the same end whose stored sequences are identical, byte for byte, become one row with the counts added. This follows from naming a sequence by its content.
+
+## Searches
+
+Most taxonomy comes from sequence similarity searches, and pipelines chain several of them. A common pattern searches reads against viral proteins, checks the hits against proteins from all domains of life to remove false positives, and then repeats both steps against nucleotide databases for the reads still unplaced. Hecatomb works this way. The standard holds any such chain, in any order, with any tools.
+
+- Each search is a run, with its tool, settings and reference release.
+- Every stored hit is an `alignment` row. Each run's taxon call is a `taxon_assignment` row. A read can be called viral by one step and bacterial by the next, and both rows are kept.
+- The order of the chain is data. A `run_input` row says that one run took its input from another and what was selected. Every step names the pipeline run it belongs to.
+- The pipeline's final answer for each sequence is the row flagged as preferred.
+
+### Search types
+
+Each alignment states what was compared with what, because identity and coordinates mean different things in each.
+
+| Search type | Query | Target | Identity is measured in |
+|---|---|---|---|
+| nucleotide to nucleotide | nucleotide | nucleotide | nucleotides |
+| translated nucleotide to protein | nucleotide, translated in six frames | protein | amino acids |
+| protein to protein | protein | protein | amino acids |
+| protein to profile | protein | a profile of a protein family | not applicable |
+
+Other types, such as k-mer classification with no alignment, are declared by the run.
+
+### Which hits are kept
+
+The standard applies no filter of its own. The producer decides what to store and declares it in `run_parameter`: the limits the search itself applied (its e-value ceiling, its maximum hits per query) and whether the bundle holds every reported hit or only the best. "Found nothing" then has a precise meaning: nothing under that ceiling. A search run that does not declare this raises a warning.
+
+Keeping weak hits matters. A low-identity hit with a poor e-value can be the only trace of an unknown virus, and a filter applied before storage removes it for every later reader.
+
+E-values depend on the size of the database searched, so they compare only within one run. Bit scores compare across runs. The manifest says this for each column.
+
+## Connectivity
+
+The tables are designed to be joined. A result recorded at one level can be carried to another by following identifiers:
+
+| From | To | Through |
+|---|---|---|
+| a read | its read cluster | `read_cluster_member`, where kept |
+| a read cluster | the contig it maps to, and where on it | `alignment`, with coordinates on the contig |
+| a contig | its genome, its cluster | `genome_member`, `cluster_member` |
+| any of these | its taxon, from each step of each pipeline | `taxon_assignment` |
+| a hit | the database entry and that entry's taxon | `reference_entry` |
+
+Three examples of what this allows:
+
+- Taxa along a contig. Join the read clusters aligned to one contig with their own taxon assignments, ordered by position. If the reads on one end carry species A and those on the other end carry species B, the contig may be a recombinant or a chimeric assembly.
+- Context for a dark read. A read cluster that matched nothing, but aligns to a contig that has a taxon, inherits a candidate identity.
+- Context for a dark contig. A contig that matched nothing as a whole may be covered by reads with weak protein hits, which point to a distant relative.
+
+For this to work, a run that maps reads to contigs declares what it mapped: read clusters or every read. If it mapped every read, positions connect to read clusters only where `read_cluster_member` is kept.
 
 ## Dark matter
 
@@ -249,8 +302,8 @@ A bundle is checked against the standard, and each check has a severity. The thr
 | Severity | Meaning | Examples |
 |---|---|---|
 | Critical | The bundle cannot be read reliably. | A required table or column is missing. An identifier appears twice in a thing table. The manifest is absent. |
-| Error | The bundle can be read, but an analysis of it would be wrong. | An identifier column points at a row that does not exist. Counts exceed the library total. A count, label or link row names no run. A thing has two preferred rows from one run. |
-| Warning | The bundle is usable but incomplete. | Counts fall short of the library total. A read cluster or contig has no bases. A run lists no parameters. A reference release has no checksum. A column has no description. |
+| Error | The bundle can be read, but an analysis of it would be wrong. | An identifier column points at a row that does not exist. Counts exceed the library total. A count, label or link row names no run. A thing has two preferred rows from one pipeline. |
+| Warning | The bundle is usable but incomplete. | Counts fall short of the library total. A read cluster or contig has no bases. A run lists no parameters. A search run does not declare which hits were kept. A reference release has no checksum. A column has no description. |
 
 A bundle conforms when it has no critical failures and no errors. Warnings are reported and do not block. For each failed check the report gives the number of failing rows and can list them.
 
@@ -273,12 +326,15 @@ Answerable with the version 1 catalog:
 9. Which unmatched sequences recur in more than one sample?
 10. Which clusters have no reference member and no named taxon, and in how many samples does each occur?
 11. Which sequences that matched nothing under an older reference release match under a newer one?
+12. Along one contig, which taxa do the aligned read clusters carry, by position?
+13. Which unmatched read clusters align to a contig that has a taxon?
+14. Which read clusters did one search step call viral and a later step reassign to a cellular taxon?
 
 Waiting on later catalog entries:
 
-12. Which species-level clusters predicted to infect Bacteroides occur in more than 10% of infants at month 3?
-13. What is the ratio of temperate to virulent genomes per sample, counting high-quality genomes only?
-14. Does the abundance of a phage follow that of its predicted host in the paired bacterial metagenome?
+15. Which species-level clusters predicted to infect Bacteroides occur in more than 10% of infants at month 3?
+16. What is the ratio of temperate to virulent genomes per sample, counting high-quality genomes only?
+17. Does the abundance of a phage follow that of its predicted host in the paired bacterial metagenome?
 
 ## Open decisions
 
@@ -312,3 +368,8 @@ None at present. The next step is to agree that scope and schema are settled.
 | 2026-11-20 | Missing bases raise a warning. | The bases are a dark sequence's only identity, but requiring them outright would exclude some datasets. |
 | 2026-11-20 | The sequence table names optional GC and complexity columns. | They separate low-complexity artifacts from unknown biology. |
 | 2026-11-20 | Hecatomb is an example, not a model the standard adheres to. | The standard must fit any pipeline. |
+| 2026-11-20 | Search chains are stored as runs joined by `run_input`, with every step's hits and calls kept and the final call flagged. | Pipelines mix translated and untranslated searches in many orders, and intermediate calls are evidence. |
+| 2026-11-20 | Database entries that were matched have their own table, `reference_entry`. | Top hit and lowest common ancestor both need the taxon of each hit. |
+| 2026-11-20 | Each alignment states its search type. | Amino acid identity and nucleotide identity are not comparable. |
+| 2026-11-20 | The producer declares which hits were kept; the standard applies no filter. | Weak hits can be the only trace of an unknown virus, and the choice belongs to the researcher. |
+| 2026-11-20 | Connectivity is a rule: every result can be followed to the things it came from. | Read-level information carried onto contigs supports analyses such as detecting chimeric or recombinant contigs. |
