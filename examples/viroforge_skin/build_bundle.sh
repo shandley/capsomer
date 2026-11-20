@@ -24,6 +24,8 @@ for assembler in megahit metaspades; do
   cap add checkv "$bundle" "$work/$assembler/checkv" \
     "$work/$assembler/genomad/contigs_summary/contigs_virus.fna" \
     --run-id "checkv.$assembler" --tool-version 1.1.1 --database-version 1.5 --input "genomad.$assembler"
+  cap add virsorter2 "$bundle" "$work/$assembler/virsorter2" "$work/$assembler/contigs.fasta" \
+    --run-id "virsorter2.$assembler" --tool-version 2.2.4 --input "$assembler"
 done
 
 cap add clusters "$bundle" "$work/votu/clusters.tsv" "$work/votu/viral_sequences.fna" \

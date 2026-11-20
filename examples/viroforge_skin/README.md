@@ -14,6 +14,7 @@ The reads come from [ViroForge](https://github.com/shandley/viroforge), which si
 | Assembly | MEGAHIT | 134 contigs of 1 kb or longer |
 | Assembly | metaSPAdes | 100 contigs of 1 kb or longer |
 | Viral identification | geNomad | 77 MEGAHIT contigs and 53 metaSPAdes contigs called viral |
+| Viral identification, second tool | VirSorter2 | 101 MEGAHIT contigs and 68 metaSPAdes contigs called viral |
 | Genome quality | CheckV | 27 of the 130 viral contigs rated high-quality |
 | Species-level clustering | vclust, 95% identity over 85% of the shorter sequence | 83 clusters |
 | Looser clustering | MMseqs2, 70% identity | 38 clusters |
@@ -28,6 +29,7 @@ The reads come from [ViroForge](https://github.com/shandley/viroforge), which si
 `questions.sql` joins the tool results to the truth. Run it with `capsomer sql bundle --file questions.sql`.
 
 - **Viral calls against the truth.** Of the 77 MEGAHIT contigs geNomad called viral, 73 came from simulated viruses, 3 from exogenous retroviruses and 1 from the phiX spike-in. Of the 57 it did not call, 39 came from simulated viruses.
+- **Two classifiers against the truth.** On the 134 MEGAHIT contigs, geNomad and VirSorter2 both called 68 viral, VirSorter2 alone called 33 and geNomad alone called 9. Of the 33 that only VirSorter2 called, 32 came from simulated viruses.
 - **Completeness against the truth.** CheckV's estimate tracks the true fraction of the genome each contig covers: 0.98 estimated against 0.97 true for high-quality MEGAHIT contigs, and 0.11 against 0.10 for low-quality ones.
 - **Two assemblers, one sequence.** Two contigs were assembled byte for byte by both MEGAHIT and metaSPAdes. Each is one `sequence` row with two `sequence_source` rows. This case is why a sequence row carries no run and no name.
 - **Clusters across assemblies.** 38 of the 83 species-level clusters hold contigs from both assemblers.
@@ -38,5 +40,6 @@ The reads come from [ViroForge](https://github.com/shandley/viroforge), which si
 
 - geNomad found no proviruses and no terminal repeats in these contigs, and CheckV found no host regions. The importer code for those cases is covered by unit tests on made-up files, not by real output.
 - Host reads were not removed before assembly.
-- `viral_call` and `quality` each have one real tool behind them. A second classifier and a second quality tool still need to be imported.
+- VirSorter2 found no partial (provirus) sequences either, so that case is also covered by unit tests only.
+- The second quality tool, CheckM2, could not be run on this dataset: the simulated reagent bacteria are random sequence with no genes. It was run on the three genomes that ship with CheckM2 and imported into a separate scratch dataset.
 - The dataset is one sample. About half of its viral reads come from tailed phages and most of the rest from papillomaviruses and polyomaviruses. A multi-sample gut virome would test clustering and abundance across samples.

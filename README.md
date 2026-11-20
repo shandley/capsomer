@@ -37,7 +37,7 @@ The name comes from the capsomer, the repeating protein unit from which a virus 
 - `spec/data-model-draft.md`: the current draft of the standard, with a log of decisions made.
 - `src/capsomer/schema/capsomer.yaml`: the catalog of tables, written in LinkML (the schema language that the MIxS sample vocabulary uses). Each table states its shape and what one row is.
 - `src/capsomer/`: a Python library that loads the schema, computes sequence identifiers, writes tables, builds the manifest and checks a dataset against the standard.
-- `src/capsomer/importers/`: importers. Some add one tool's results to a dataset: contigs from any assembler, geNomad, CheckV, clusters from vclust or MMseqs2, CoverM coverage, read mappings (SAM or BAM), sequence alignments (PAF) and fastp read totals. Two build a whole dataset: one from Hecatomb version 1 results, and one from the ground truth of a [ViroForge](https://github.com/shandley/viroforge) synthetic dataset.
+- `src/capsomer/importers/`: importers. Some add one tool's results to a dataset: contigs from any assembler, geNomad, VirSorter2, CheckV, CheckM2, clusters from vclust or MMseqs2, CoverM coverage, read mappings (SAM or BAM), sequence alignments (PAF) and fastp read totals. Two build a whole dataset: one from Hecatomb version 1 results, and one from the ground truth of a [ViroForge](https://github.com/shandley/viroforge) synthetic dataset.
 - `examples/questions.sql`: test questions from the specification, written as SQL.
 - `examples/viroforge_skin/`: a worked example. Two assemblers, geNomad, CheckV, two clustering tools and a read mapper were run on simulated reads, and their results were added to the simulation's ground truth, so every result can be checked against what is true.
 

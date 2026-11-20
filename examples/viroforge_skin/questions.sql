@@ -59,3 +59,16 @@ SELECT (SELECT min(name) FROM sequence_source x WHERE x.sequence_id = c.sequence
 FROM coverage c JOIN truth t USING (sequence_id)
 JOIN coverage tc ON tc.sequence_id = t.true_sequence_id AND tc.run_id = 'viroforge'
 WHERE c.run_id = 'coverm' ORDER BY 2 DESC LIMIT 8;
+
+-- Two classifiers on the same contigs: where do geNomad and VirSorter2 agree, and what is true?
+SELECT g.call AS genomad, v.call AS virsorter2, coalesce(t.origin, 'no alignment') AS true_origin, count(*) AS contigs
+FROM sequence_source s
+JOIN viral_call g ON g.sequence_id = s.sequence_id AND g.run_id = 'genomad.megahit'
+JOIN viral_call v ON v.sequence_id = s.sequence_id AND v.run_id = 'virsorter2.megahit'
+LEFT JOIN truth t ON t.sequence_id = s.sequence_id
+WHERE s.run_id = 'megahit' GROUP BY ALL ORDER BY 1, 2, 4 DESC;
+
+-- Contigs VirSorter2 did not list still carry its score, so another cutoff can be tried.
+SELECT call, count(*) AS contigs, count(virus_score) AS with_score, round(min(virus_score), 2) AS lowest,
+  round(max(virus_score), 2) AS highest
+FROM viral_call WHERE run_id = 'virsorter2.megahit' GROUP BY 1;

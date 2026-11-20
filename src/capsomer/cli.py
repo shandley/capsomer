@@ -8,6 +8,7 @@ from typing import Any
 
 from capsomer.builder import Builder
 from capsomer.bundle import run_sql
+from capsomer.importers.checkm2 import add_checkm2
 from capsomer.importers.checkv import add_checkv
 from capsomer.importers.clusters import LAYOUTS, add_clusters
 from capsomer.importers.contigs import add_contigs
@@ -16,6 +17,7 @@ from capsomer.importers.hecatomb import import_hecatomb
 from capsomer.importers.mapping import add_coverm, add_paf, add_read_mapping
 from capsomer.importers.study import add_fastp, init_bundle
 from capsomer.importers.viroforge import import_viroforge
+from capsomer.importers.virsorter2 import add_virsorter2
 from capsomer.validate import conforms, format_report, validate
 
 
@@ -72,6 +74,23 @@ def _add_parser(commands: Any) -> None:
     checkv.add_argument("fasta", type=Path, help="the FASTA file CheckV was given")
     checkv.add_argument("--database-version")
 
+    virsorter2 = tool("virsorter2", "VirSorter2 viral calls")
+    virsorter2.add_argument("results", type=Path, help="VirSorter2 output folder")
+    virsorter2.add_argument("fasta", type=Path, help="the FASTA file VirSorter2 was given")
+    virsorter2.add_argument("--database-version")
+    virsorter2.add_argument(
+        "--preferred", action="store_true", help="mark as the pipeline's answer"
+    )
+
+    checkm2 = tool("checkm2", "CheckM2 completeness and contamination of genomes")
+    checkm2.add_argument("report", type=Path, help="CheckM2 quality_report.tsv")
+    checkm2.add_argument(
+        "genomes", type=Path, help="folder of genome FASTA files CheckM2 was given"
+    )
+    checkm2.add_argument("--extension", default="fna", help="extension of the genome files")
+    checkm2.add_argument("--binning-run", help="the run that formed the genomes")
+    checkm2.add_argument("--database-version")
+
     clusters = tool("clusters", "clusters of sequences from a two-column table")
     clusters.add_argument("table", type=Path)
     clusters.add_argument("fasta", type=Path, help="the FASTA file that was clustered")
@@ -123,6 +142,16 @@ def _add(args: argparse.Namespace) -> None:
             ),
             "checkv": lambda: add_checkv(
                 builder, args.results, args.fasta, tool_version=args.tool_version,
+                database_version=args.database_version, run_id=run_id, parent=parent, inputs=inputs,
+            ),
+            "virsorter2": lambda: add_virsorter2(
+                builder, args.results, args.fasta, tool_version=args.tool_version,
+                database_version=args.database_version, preferred=args.preferred,
+                run_id=run_id, parent=parent, inputs=inputs,
+            ),
+            "checkm2": lambda: add_checkm2(
+                builder, args.report, args.genomes, extension=args.extension,
+                binning_run=args.binning_run, tool_version=args.tool_version,
                 database_version=args.database_version, run_id=run_id, parent=parent, inputs=inputs,
             ),
             "clusters": lambda: add_clusters(

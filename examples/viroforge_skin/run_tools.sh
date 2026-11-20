@@ -8,7 +8,7 @@
 #   genomad download-database tools/db && checkv download_database tools/db
 # Versions used for the example: fastp 1.4.0, MEGAHIT 1.2.9, SPAdes 4.3.0, geNomad 1.13.0 (database
 # 1.9), CheckV 1.1.1 (database 1.5), vclust 1.3.1, MMseqs2 19.ab57c, minimap2 2.31, samtools 1.25,
-# CoverM 0.8.0.
+# CoverM 0.8.0, VirSorter2 2.2.4.
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 dataset="${1:?give the ViroForge dataset folder}"
@@ -35,6 +35,15 @@ for assembler in megahit metaspades; do
   checkv end_to_end "$work/$assembler/genomad/contigs_summary/contigs_virus.fna" \
     "$work/$assembler/checkv" -t "$threads" -d "$db/checkv-db-v1.5"
 done
+
+# A second viral classifier. VirSorter2 2.2.4 needs scikit-learn 0.22.1, which has no Apple Silicon
+# build; the example used a separate Intel environment and VIRSORTER points at its virsorter.
+if [ -n "${VIRSORTER:-}" ]; then
+  for assembler in megahit metaspades; do
+    "$VIRSORTER" run -w "$work/$assembler/virsorter2" -i "$work/$assembler/contigs.fasta" \
+      -d "$db/vs2" -j 10 --use-conda-off --min-length 1000 all
+  done
+fi
 
 # Species-level clusters of every sequence geNomad called viral, from both assemblies.
 cat "$work"/{megahit,metaspades}/genomad/contigs_summary/contigs_virus.fna > "$work/votu/viral_sequences.fna"

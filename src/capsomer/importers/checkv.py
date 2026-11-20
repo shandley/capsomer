@@ -84,8 +84,8 @@ def add_checkv(
     added = builder.add(
         "quality",
         f"SELECT f.sequence_id, {literal(run_id)} AS run_id, "
-        "CAST(q.completeness AS DOUBLE) / 100 AS completeness, q.completeness_method, "
-        "CAST(q.contamination AS DOUBLE) / 100 AS contamination, q.checkv_quality AS tier, "
+        "round(CAST(q.completeness AS DOUBLE) / 100, 6) AS completeness, q.completeness_method, "
+        "round(CAST(q.contamination AS DOUBLE) / 100, 6) AS contamination, q.checkv_quality AS tier, "
         "CASE q.miuvig_quality WHEN 'High-quality' THEN 'high_quality' "
         "WHEN 'Genome-fragment' THEN 'genome_fragment' END AS miuvig_tier, "
         "CASE r.prediction_type WHEN 'DTR' THEN 'direct' WHEN 'ITR' THEN 'inverted' ELSE 'none' END AS terminal_repeat, "

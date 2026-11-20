@@ -291,7 +291,16 @@ A result the catalog does not cover goes in a table whose name starts with `x_`.
 
 ## Later catalog entries
 
-A table enters the catalog when real output of a widely used tool fills it. It stays provisional until the output of a second, independent tool fills it too. `viral_call` and `quality` entered on geNomad 1.13 and CheckV 1.1 output and are provisional: no second classifier or quality tool has been imported yet.
+A table enters the catalog when real output of a widely used tool fills it. It stays provisional until the output of a second, independent tool fills it too.
+
+`viral_call` and `quality` have passed that test. Two tools were imported for each, from real output:
+
+| Table | First tool | Second tool | Columns only one tool fills |
+|---|---|---|---|
+| `viral_call` | geNomad 1.13 | VirSorter2 2.2.4 | `plasmid_score` and `cellular_score` (geNomad) |
+| `quality` | CheckV 1.1 | CheckM2 1.1 | `tier` and `miuvig_tier` (CheckV) |
+
+CheckM2 scores bacterial and archaeal genomes, so it tests the table's second subject: a genome made of several sequences. A second quality tool for viruses has not been imported.
 
 The remaining entries are not specified. They will be added in this order.
 
@@ -406,3 +415,4 @@ None at present. The next step is to agree that scope and schema are settled.
 | 2026-11-20 | A viral classifier that calls a sequence neither virus nor plasmid writes a row with call `none` and its scores. | "Examined and not called" must differ from "never examined", and the scores let a later reader choose another cutoff. |
 | 2026-11-20 | Completeness and contamination are stored as fractions. | Identity and coverage are already fractions, and one convention avoids errors of a factor of 100. |
 | 2026-11-20 | A table enters the catalog on real output of one tool and stays provisional until a second independent tool fills it. | It keeps the catalog from taking the shape of any one tool. |
+| 2026-11-20 | `viral_call` and `quality` are no longer provisional. | VirSorter2 and CheckM2 output filled them with no change to either table. |

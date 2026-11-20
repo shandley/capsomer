@@ -287,3 +287,86 @@ def test_sequences_with_no_terminal_repeats_say_so(bundle: Path) -> None:
         "SELECT run_id, terminal_repeat FROM quality WHERE sequence_id = ?",
         [ids.sequence_id(SEQ["c"])],
     ).fetchall() == [("genomad", "none")]
+
+
+def test_virsorter2_calls_scores_and_partial_sequences(
+    tmp_path: Path, bundle: Path, tools: dict[str, Path]
+) -> None:
+    """Headers copied from VirSorter2 2.2.4 output. The values are made up."""
+    from capsomer.importers.virsorter2 import add_virsorter2
+
+    out = tmp_path / "vs2"
+    tsv(
+        out / "final-viral-score.tsv",
+        "seqname dsDNAphage ssDNA max_score max_score_group length hallmark viral cellular",
+        "k141_1||full 0.98 0.40 0.98 dsDNAphage 58 3 100.000 0.000",
+        "k141_2||0_partial 0.95 0.10 0.95 dsDNAphage 30 1 80.000 20.000",
+        "k141_3||lt2gene nan nan nan ssDNA 50 1 nan nan",
+    )
+    tsv(out / "iter-0/all-fullseq-proba.tsv", "seqname dsDNAphage ssDNA", "k141_2 0.30 0.20")
+    fasta(out / "final-viral-combined.fa", {"k141_1||full": SEQ["a"][1:59], "k141_2||0_partial": SEQ["b"][20:50]})  # fmt: skip
+    (out / "config.yaml").write_text("PROBA_CUTOFF: 0.5\nGROUPS: [dsDNAphage, ssDNA]\nSEQFILE: /somewhere/private\n")  # fmt: skip
+    with Builder(bundle) as b:
+        add_virsorter2(b, out, tools["first"], run_id="vs2", tool_version="2.2.4")
+    assert conforms(validate(bundle))
+    con = connect(bundle)
+    rows = {
+        row[0]: row[1:]
+        for row in con.execute(
+            "SELECT s.sequence_id, v.call, v.virus_score, v.n_hallmark_genes, v.fewer_than_two_genes "
+            "FROM viral_call v JOIN sequence s USING (sequence_id) WHERE v.run_id = 'vs2'"
+        ).fetchall()
+    }
+    region = ids.sequence_id(SEQ["b"][20:50])
+    assert rows == {
+        ids.sequence_id(SEQ["a"]): ("virus", 0.98, 3, False),
+        ids.sequence_id(SEQ["b"]): ("none", 0.3, None, None),
+        ids.sequence_id(SEQ["c"]): ("virus", None, 1, True),
+        region: ("virus", 0.95, 1, False),
+    }
+    assert con.execute(
+        "SELECT to_sequence_id, region_start, region_end FROM sequence_relation WHERE from_sequence_id = ?",
+        [region],
+    ).fetchall() == [(ids.sequence_id(SEQ["b"]), 21, 50)]
+    settings = dict(
+        con.execute("SELECT name, value FROM run_parameter WHERE run_id = 'vs2'").fetchall()
+    )
+    assert settings == {"proba_cutoff": "0.5", "groups": "dsDNAphage,ssDNA"}
+    # Two classifiers now describe the same contig.
+    assert con.execute(
+        "SELECT run_id, call FROM viral_call WHERE sequence_id = ? ORDER BY 1",
+        [ids.sequence_id(SEQ["b"])],
+    ).fetchall() == [("genomad", "none"), ("vs2", "none")]
+
+
+def test_checkm2_quality_describes_genomes(
+    tmp_path: Path, bundle: Path, tools: dict[str, Path]
+) -> None:
+    """Header copied from CheckM2 1.1.0 output. The values are made up."""
+    from capsomer.importers.checkm2 import add_checkm2
+
+    genomes = tmp_path / "bins"
+    genomes.mkdir()
+    fasta(genomes / "bin1.fna", {"x": SEQ["a"], "y": SEQ["d"]})
+    fasta(genomes / "bin2.fna", {"z": SEQ["b"]})
+    report = tsv(
+        tmp_path / "quality_report.tsv",
+        "Name Completeness Contamination Completeness_Model_Used Translation_Table_Used Coding_Density "
+        "Contig_N50 Average_Gene_Length Genome_Size GC_Content Total_Coding_Sequences Total_Contigs "
+        "Max_Contig_Length Additional_Notes",
+        "bin1 91.5 135.58 Neural~Network~(Specific~Model) 11 0.9 60 300.0 100 0.5 2 2 60 None",
+        "bin2 40.0 0.5 Gradient~Boost~(General~Model) 11 0.8 80 300.0 80 0.5 1 1 80 None",
+    )
+    with Builder(bundle) as b:
+        add_checkm2(b, report, genomes, run_id="checkm2", binning_run="asm1")
+    assert conforms(validate(bundle))
+    con = connect(bundle)
+    two = ids.genome_id([ids.sequence_id(SEQ["a"]), ids.sequence_id(SEQ["d"])])
+    assert con.execute(
+        "SELECT g.genome_id, g.kind, g.n_sequences, g.run_id, q.completeness, q.contamination, q.completeness_method "
+        "FROM quality q JOIN genome g USING (genome_id) WHERE q.run_id = 'checkm2' ORDER BY g.n_sequences DESC"
+    ).fetchall() == [
+        (two, "bin", 2, "asm1", 0.915, 1.3558, "Neural Network (Specific Model)"),
+        (ids.genome_id([ids.sequence_id(SEQ["b"])]), "single_sequence", 1, None, 0.4, 0.005, "Gradient Boost (General Model)"),
+    ]  # fmt: skip
+    assert con.execute("SELECT count(*) FROM genome_member WHERE genome_id = ?", [two]).fetchall() == [(2,)]  # fmt: skip
