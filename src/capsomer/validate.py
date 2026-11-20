@@ -19,7 +19,7 @@ from capsomer.bundle import MANIFEST_NAME, literal, quote, relation_columns
 from capsomer.schema import Table, load_catalog
 
 SEVERITIES = ("critical", "error", "warning")
-COUNT_TABLES = ("read_count", "coverage")
+COUNT_TABLES = ("read_count", "coverage", "taxon_profile")
 DIGEST_SAMPLE = 2000
 
 
@@ -233,7 +233,10 @@ class _Checker:
         )
         if not self.has(name, "is_preferred") or not self.has("run", "run_id", "parent_run_id"):
             return
-        subject = "coalesce('s:' || sequence_id, 'g:' || genome_id, 'c:' || cluster_id)"
+        kinds = [
+            c for c in ("sequence_id", "genome_id", "cluster_id", "read_id") if self.has(name, c)
+        ]
+        subject = "coalesce(" + ", ".join(f"'{c}:' || {c}" for c in kinds) + ")"
         rows = self.count(
             "WITH RECURSIVE up(run_id, root) AS ("
             " SELECT run_id, run_id FROM run WHERE parent_run_id IS NULL"

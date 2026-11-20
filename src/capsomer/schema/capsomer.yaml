@@ -42,6 +42,8 @@ enums:
       read_mapping: {}
       binning: {}
       genome_clustering: {}
+      profiling: {description: "A step that reports taxa per library without reporting sequences."}
+      simulation: {description: "Generation of synthetic data with known truth."}
       sequence_clustering: {}
       other: {}
   ReleaseKind:
@@ -93,6 +95,7 @@ enums:
       protein_to_protein: {description: "Identity is measured in amino acids."}
       protein_to_profile: {}
       kmer: {description: "Classification by shared k-mers, with no alignment."}
+      marker_gene: {description: "Classification by marker genes."}
       other: {}
   AssignmentRule:
     permissible_values:
@@ -212,7 +215,7 @@ classes:
     description: >-
       Nucleotide sequences: representatives of read clusters, contigs, and
       reference sequences whose bases the bundle holds.
-    annotations: {shape: thing, row: "one nucleotide sequence, or one read pair kept as a unit", catalog_required: true}
+    annotations: {shape: thing, row: "one nucleotide sequence, or one read pair kept as a unit"}
     attributes:
       sequence_id:
         identifier: true
@@ -329,6 +332,38 @@ classes:
       covered_fraction: {range: float, minimum_value: 0, maximum_value: 1, description: "Fraction of the contig covered by at least one read.", annotations: {measure: raw, summable: false}}
       covered_bases: {range: integer, description: "Bases covered by at least one read.", annotations: {measure: raw, summable: false, unit: bases}}
 
+  TaxonProfile:
+    description: >-
+      Abundance of taxa per library, for tools that report taxa without
+      reporting sequences.
+    annotations: {shape: count, row: one taxon in one library}
+    unique_keys:
+      primary:
+        unique_key_slots: [taxon_id, library_id, run_id]
+    attributes:
+      taxon_id: {range: Taxon, required: true, description: "The taxon."}
+      library_id: {range: Library, required: true, description: "The library."}
+      run_id: {range: Run, required: true, description: "The run that made the profile."}
+      direct_count:
+        range: integer
+        description: "Fragments or reads assigned to this taxon itself."
+        annotations: {measure: raw, summable: true, unit_column: count_unit}
+      clade_count:
+        range: integer
+        description: "Fragments or reads assigned to this taxon or any taxon below it. Do not sum across ranks."
+        annotations: {measure: raw, summable: false, unit_column: count_unit}
+      estimated_count:
+        range: float
+        description: "An abundance estimate in fragments or reads, after the tool redistributes ambiguous assignments."
+        annotations: {measure: estimated, summable: true, unit_column: count_unit}
+      count_unit: {range: CountUnit, description: "Whether the counts are in fragments or reads."}
+      relative_abundance:
+        range: float
+        minimum_value: 0
+        maximum_value: 1
+        description: "Fraction of the library the tool attributes to the taxon. The run states the denominator."
+        annotations: {measure: normalized, summable: false}
+
   # ---------------------------------------------------------------- labels
 
   TaxonAssignment:
@@ -338,13 +373,13 @@ classes:
       taxon and outcome none.
     annotations:
       shape: label
-      row: "one taxon given to one sequence, genome or cluster by one run, or the record that the run found none"
-      catalog_required: true
-      exactly_one: "sequence_id genome_id cluster_id"
+      row: "one taxon given to one sequence, genome, cluster or read by one run, or the record that the run found none"
+      exactly_one: "sequence_id genome_id cluster_id read_id"
     attributes:
       sequence_id: {range: Sequence, description: "The sequence described, if the subject is a sequence."}
       genome_id: {range: Genome, description: "The genome described, if the subject is a genome."}
       cluster_id: {range: Cluster, description: "The cluster described, if the subject is a cluster."}
+      read_id: {range: Read, description: "The original read described, if the subject is a read."}
       run_id: {range: Run, required: true, description: "The run that made the call."}
       outcome: {range: Outcome, required: true, description: "Whether the run reached an answer."}
       taxon_id: {range: Taxon, description: "The taxon assigned. Empty when outcome is none."}

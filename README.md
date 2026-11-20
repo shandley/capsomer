@@ -63,7 +63,7 @@ A dataset is plain Parquet, so DuckDB, Python, R or any other Parquet reader can
 
 ## Background
 
-The design began from the data structure in [Hecatomb](https://github.com/shandley/hecatomb), a virome pipeline that analyses reads and contigs together.
+Capsomer is not tied to any pipeline. A dataset can come from a read classifier that reports only taxa, from an assembly workflow, or from a pipeline that does both. The first importer is for [Hecatomb](https://github.com/shandley/hecatomb), because its results were at hand; importers for other tools will follow.
 
 ## Licence
 

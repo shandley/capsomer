@@ -34,17 +34,9 @@ def test_genome_id_ignores_member_order() -> None:
 
 def test_catalog_shapes_and_references() -> None:
     catalog = load_catalog()
-    assert len(catalog.tables) == 22
+    assert len(catalog.tables) == 23
     required = {t.name for t in catalog.tables.values() if t.catalog_required}
-    assert required == {
-        "sample",
-        "library",
-        "run",
-        "reference_release",
-        "sequence",
-        "taxon",
-        "taxon_assignment",
-    }
+    assert required == {"sample", "library", "run", "reference_release", "taxon"}
     for table in catalog.tables.values():
         assert table.shape in SHAPES
         assert table.row
@@ -106,3 +98,20 @@ def test_broken_bundles_are_caught(tmp_path: Path) -> None:
     found = checks(list(validate(write_bundle(tmp_path / "c", tables))))
     assert ("critical", "required_table") in found
     assert ("error", "identifier_matches_bases") in found
+
+
+def test_profile_only_bundle_conforms(tmp_path: Path) -> None:
+    """A profiler reports taxa per library and no sequences. That is a valid bundle."""
+    tables = {
+        k: v
+        for k, v in minimal_tables().items()
+        if k in {"sample", "library", "reference_release", "taxon"}
+    }
+    tables["run"] = "SELECT 'k' AS run_id, 'demo profiler' AS tool, 'profiling' AS step"
+    tables["run_parameter"] = "SELECT 'k' AS run_id, 'confidence' AS name, '0.1' AS value"
+    tables["taxon_profile"] = (
+        "SELECT 'tax:1' AS taxon_id, 'l1' AS library_id, 'k' AS run_id, 4 AS direct_count, "
+        "4 AS clade_count, 'fragments' AS count_unit, 0.8 AS relative_abundance"
+    )
+    findings = validate(write_bundle(tmp_path / "profile", tables))
+    assert conforms(findings), findings

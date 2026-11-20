@@ -87,7 +87,7 @@ An optional column on `sequence` holds the digest of whichever strand sorts firs
 
 The shapes make any table readable. The catalog makes common tables mean the same thing in every bundle, by fixing each table's name and columns. Version 1 covers what a phyloseq object holds, plus the links between reads, contigs, genomes and clusters.
 
-A valid bundle needs the tables marked required, at least one count table, and the manifest. That is eight tables.
+A valid bundle needs the tables marked required, at least one count table, and the manifest. That is six tables: samples, libraries, runs, a reference release, taxa and one count table. Sequences are not required, so a profiler that reports only taxa per sample produces a valid bundle, and so does a pipeline that keeps every read and contig.
 
 ### Things
 
@@ -98,7 +98,7 @@ A valid bundle needs the tables marked required, at least one count table, and t
 | `run` (required) | one execution of one tool | Tool, version, the step it performed, and the pipeline run it belongs to. |
 | `reference_entry` | one database entry that something in the bundle matched | Its release, accession, description, length, molecule (nucleotide or protein) and taxon. |
 | `reference_release` (required) | one dated version of a database, taxonomy or catalog | Name, version, date, source, checksum, and kind: formal taxonomy, catalog of uncultivated viruses, or sequence database. |
-| `sequence` (required) | one nucleotide sequence, or one read pair kept as a unit | Kind (read cluster, read pair cluster, contig or reference), length, the bases, and the name its producer gave it. A read pair has a second column of bases. Optional columns hold GC content and a complexity score, which help separate low-complexity artifacts from unknown biology. |
+| `sequence` | one nucleotide sequence, or one read pair kept as a unit | Kind (read cluster, read pair cluster, contig or reference), length, the bases, and the name its producer gave it. A read pair has a second column of bases. Optional columns hold GC content and a complexity score, which help separate low-complexity artifacts from unknown biology. |
 | `taxon` (required) | one taxon in one release | The release's own identifier, name, rank, parent taxon, genome composition (Baltimore class) and host category. A group in a catalog of uncultivated viruses is a taxon too, under that catalog's release. |
 | `genome` | one unit treated as a virus genome | Kind: single sequence, bin, or group of segments. |
 | `cluster` | one cluster of genomes or of sequences | Level (strain, species, genus, family, or a level the researcher defines) and the representative. A cluster needs no taxon name, so unclassified groups are first-class. |
@@ -112,12 +112,13 @@ A valid bundle needs the tables marked required, at least one count table, and t
 |---|---|---|
 | `read_count` | one read cluster in one library, in one read form | The count, the read form it was counted in, and for independent reads the end of the fragment they came from (see "Read clusters"). |
 | `coverage` | one contig in one library | fragments mapped, mean depth, fraction of the contig covered |
+| `taxon_profile` | one taxon in one library | Fragments assigned to the taxon itself, fragments assigned to it or anything below it, the tool's abundance estimate, and relative abundance. For tools that report taxa without sequences. |
 
 ### Labels
 
 | Table | One row is | Value columns |
 |---|---|---|
-| `taxon_assignment` (required) | one taxon given to one sequence, genome or cluster, or the record that a search found none | The taxon, the search type and the rule (top hit, lowest common ancestor). Each step of a pipeline writes its own rows; the final answer is flagged as preferred. |
+| `taxon_assignment` | one taxon given to one sequence, genome, cluster or original read, or the record that a search found none | The taxon, the search type and the rule (top hit, lowest common ancestor). Each step of a pipeline writes its own rows; the final answer is flagged as preferred. |
 | `run_parameter` | one setting of one run | Name, value, unit. Every threshold that decides which rows exist is listed here. |
 | `identifier_map` | one external identifier for one sample, library, sequence or genome | The authority that issued it and the identifier. |
 
@@ -200,7 +201,7 @@ Each alignment states what was compared with what, because identity and coordina
 | protein to protein | protein | protein | amino acids |
 | protein to profile | protein | a profile of a protein family | not applicable |
 
-Other types, such as k-mer classification with no alignment, are declared by the run.
+Classification by shared k-mers and by marker genes are search types too. They produce taxon assignments or taxon profiles and no alignment rows.
 
 ### Which hits are kept
 
@@ -277,12 +278,11 @@ None is specified yet. They will be added in this order.
 |---|---|---|---|
 | 1 | `viral_call` | label | virus, plasmid or cellular, for a sequence |
 | 1 | `quality` | label | completeness and contamination of a genome |
-| 2 | `taxon_profile` | count | a taxon in a library, for profilers that report taxa without sequences |
-| 3 | `host_prediction` | label or link | a host taxon, or a host genome held in the bundle |
-| 3 | `lifestyle` | label | temperate or virulent |
-| 4 | `origin_class` | label | infects the sampled host, infects its microbiota, passes through from diet or environment, or reagent contaminant |
-| 5 | `feature` | thing | a gene or other interval on a sequence |
-| 5 | `function` | label | a protein family for a feature |
+| 2 | `host_prediction` | label or link | a host taxon, or a host genome held in the bundle |
+| 2 | `lifestyle` | label | temperate or virulent |
+| 3 | `origin_class` | label | infects the sampled host, infects its microbiota, passes through from diet or environment, or reagent contaminant |
+| 4 | `feature` | thing | a gene or other interval on a sequence |
+| 4 | `function` | label | a protein family for a feature |
 | on demand | `genome_similarity` | link | identity and aligned fraction for a pair of genomes |
 
 `origin_class` has no counterpart in any surveyed tool. Version 1 already holds its inputs: the host category on `taxon` and the control type on `sample`.
@@ -374,3 +374,5 @@ None at present. The next step is to agree that scope and schema are settled.
 | 2026-11-20 | The producer declares which hits were kept; the standard applies no filter. | Weak hits can be the only trace of an unknown virus, and the choice belongs to the researcher. |
 | 2026-11-20 | Connectivity is a rule: every result can be followed to the things it came from. | Read-level information carried onto contigs supports analyses such as detecting chimeric or recombinant contigs. |
 | 2026-11-20 | The table of original reads, `read`, is in version 1 as an optional thing table. | When every read is mapped to contigs, it is the only route from a mapping position back to read-level taxonomy. |
+| 2026-11-20 | Sequences and taxon assignments are no longer required, and `taxon_profile` is a version 1 count table. | Many widely used tools report taxa per sample with no sequences. The standard must not assume a pipeline that keeps them. |
+| 2026-11-20 | A taxon can be assigned to an original read. | Classifiers that label every read, with no clustering, need a subject for their calls. |
