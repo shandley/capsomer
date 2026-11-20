@@ -75,6 +75,8 @@ A dataset is plain Parquet, so DuckDB, Python, R or any other Parquet reader can
 
 Capsomer is not tied to any pipeline. A dataset can come from a read classifier that reports only taxa, from an assembly workflow, or from a pipeline that does both. Tools report results by sequence name; an importer reads the FASTA file the tool was given, computes each sequence's identifier from its bases, and joins on that. `capsomer add --help` lists the tools that can be added today.
 
+[capsomer-workflow](https://github.com/shandley/capsomer-workflow) is a separate Snakemake workflow that runs a contig-based virome analysis and writes a Capsomer dataset. It is one producer of the format; the standard does not depend on it.
+
 ## Licence
 
 MIT. See `LICENSE`.
