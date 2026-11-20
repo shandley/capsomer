@@ -9,8 +9,6 @@ What Hecatomb's output cannot supply is left empty and reported in the
 manifest notes, not guessed.
 """
 
-import re
-from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -18,6 +16,7 @@ import duckdb
 
 from capsomer import ids
 from capsomer.bundle import build_manifest, literal, quote, relation_columns, write_table
+from capsomer.importers.common import fasta_records, snake, tsv, values
 
 PIPELINE = "hecatomb"
 RANKS = (
@@ -46,39 +45,6 @@ class Summary:
     samples: list[str]
     rows: dict[str, int] = field(default_factory=dict[str, int])
     identical_clusters_merged: int = 0
-
-
-def fasta_records(path: Path) -> Iterator[tuple[str, str]]:
-    name: str | None = None
-    chunks: list[str] = []
-    with path.open() as handle:
-        for line in handle:
-            if line.startswith(">"):
-                if name is not None:
-                    yield name, "".join(chunks)
-                name, chunks = line[1:].strip(), []
-            else:
-                chunks.append(line.strip())
-    if name is not None:
-        yield name, "".join(chunks)
-
-
-def tsv(path: Path) -> str:
-    return (
-        f"read_csv({literal(str(path))}, delim='\\t', header=true, all_varchar=true, "
-        "quote='', escape='', nullstr='NA', null_padding=true, strict_mode=false)"
-    )
-
-
-def values(rows: list[tuple[str | None, ...]], columns: tuple[str, ...]) -> str:
-    body = ", ".join(
-        "(" + ", ".join("NULL" if v is None else literal(v) for v in row) + ")" for row in rows
-    )
-    return f"SELECT * FROM (VALUES {body}) AS t({', '.join(columns)})"
-
-
-def snake(name: str) -> str:
-    return re.sub(r"[^0-9a-z]+", "_", name.lower()).strip("_")
 
 
 def write_read_clusters(seqtable: Path, samples: set[str], out: Path) -> None:
@@ -221,7 +187,7 @@ def import_hecatomb(
         write_contigs(assembly, work / "contigs.tsv")
         con.execute(
             f"CREATE TABLE ctg AS SELECT * FROM read_csv({literal(str(work / 'contigs.tsv'))}, "
-            "delim='\\t', header=true, quote='', columns={'sequence_id': 'VARCHAR', 'name': 'VARCHAR', "
+            "delim='\\t', header=true, quote='', max_line_size=1000000000, columns={'sequence_id': 'VARCHAR', 'name': 'VARCHAR', "
             "'length': 'BIGINT', 'gc': 'DOUBLE', 'bases': 'VARCHAR'})"
         )
         con.execute("CREATE TABLE kept (sequence_id VARCHAR)")

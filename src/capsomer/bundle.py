@@ -128,12 +128,14 @@ def build_manifest(
     extra_columns: dict[str, dict[str, str]] | None = None,
     access: dict[str, str] | None = None,
     notes: list[str] | None = None,
+    custom_tables: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Describe every Parquet table in a bundle and write manifest.json.
 
     extra_columns gives descriptions for columns outside the catalog, as
     {table: {column: description}}. access gives an access tier per table and
-    defaults to "open".
+    defaults to "open". custom_tables declares each table outside the catalog as
+    {table: {"shape", "one_row_is", "description", "key"}}.
     """
     catalog = load_catalog()
     con = duckdb.connect()
@@ -152,12 +154,13 @@ def build_manifest(
                 entry["extra"] = True
             columns[column] = entry
         rows = con.execute(f"SELECT count(*) FROM {scan}").fetchone()
+        custom = (custom_tables or {}).get(name, {})
         tables[name] = {
-            "shape": known.shape if known else None,
+            "shape": known.shape if known else custom.get("shape"),
             "catalog_entry": f"capsomer:{name}@{catalog.version}" if known else None,
-            "one_row_is": known.row if known else None,
-            "description": known.description if known else "",
-            "key": list(known.key) if known else [],
+            "one_row_is": known.row if known else custom.get("one_row_is"),
+            "description": known.description if known else custom.get("description", ""),
+            "key": list(known.key) if known else list(custom.get("key", [])),
             "row_count": int(rows[0]) if rows else 0,
             "access": (access or {}).get(name, "open"),
             "columns": columns,

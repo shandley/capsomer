@@ -37,7 +37,7 @@ The name comes from the capsomer, the repeating protein unit from which a virus 
 - `spec/data-model-draft.md`: the current draft of the standard, with a log of decisions made.
 - `src/capsomer/schema/capsomer.yaml`: the catalog of tables, written in LinkML (the schema language that the MIxS sample vocabulary uses). Each table states its shape and what one row is.
 - `src/capsomer/`: a Python library that loads the schema, computes sequence identifiers, writes tables, builds the manifest and checks a dataset against the standard.
-- `src/capsomer/importers/hecatomb.py`: an importer for Hecatomb version 1 results.
+- `src/capsomer/importers/`: importers. One reads Hecatomb version 1 results. One reads the ground truth of a [ViroForge](https://github.com/shandley/viroforge) synthetic dataset, which gives a dataset that no analysis pipeline shaped.
 - `examples/questions.sql`: test questions from the specification, written as SQL.
 
 The draft rests on three background surveys of existing data formats, virome tool outputs and consortium data models. Those are working notes and are not published here.
@@ -53,6 +53,9 @@ uv run pytest
 # Build a dataset from Hecatomb results, then check it.
 uv run capsomer import-hecatomb path/to/hecatomb/results my_dataset --n-samples 4
 uv run capsomer validate my_dataset
+
+# Build a ground-truth dataset from a ViroForge simulation.
+uv run capsomer import-viroforge path/to/viroforge/output truth_dataset
 
 # Ask questions of it.
 uv run capsomer sql my_dataset --file examples/questions.sql

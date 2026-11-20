@@ -6,6 +6,7 @@ from pathlib import Path
 
 from capsomer.bundle import run_sql
 from capsomer.importers.hecatomb import import_hecatomb
+from capsomer.importers.viroforge import import_viroforge
 from capsomer.validate import conforms, format_report, validate
 
 
@@ -27,6 +28,13 @@ def main(argv: list[str] | None = None) -> int:
     hecatomb.add_argument("--sample-id-column", default="sampleID")
     hecatomb.add_argument("--title")
 
+    viroforge = commands.add_parser(
+        "import-viroforge", help="build a ground-truth bundle from a ViroForge dataset"
+    )
+    viroforge.add_argument("dataset", type=Path, help="ViroForge output folder")
+    viroforge.add_argument("bundle", type=Path, help="folder to write the bundle into")
+    viroforge.add_argument("--sample-id")
+
     sql = commands.add_parser("sql", help="run SQL against a bundle")
     sql.add_argument("bundle", type=Path)
     sql.add_argument("statement", nargs="?", help="SQL to run")
@@ -36,6 +44,14 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "sql":
         print(run_sql(args.bundle, args.file.read_text() if args.file else args.statement))
         return 0
+    if args.command == "import-viroforge":
+        truth = import_viroforge(args.dataset, args.bundle, sample_id=args.sample_id)
+        print(f"Imported ViroForge sample {truth.sample} into {args.bundle}")
+        for name, rows in truth.rows.items():
+            print(f"  {name:18} {rows:>12,} rows")
+        print(
+            f"  reads whose source genome is not in the reference file: {truth.reads_without_source:,}"
+        )
     if args.command == "import-hecatomb":
         summary = import_hecatomb(
             args.results,

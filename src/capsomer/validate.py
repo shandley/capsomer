@@ -16,7 +16,7 @@ import duckdb
 
 from capsomer import ids
 from capsomer.bundle import MANIFEST_NAME, literal, quote, relation_columns
-from capsomer.schema import Table, load_catalog
+from capsomer.schema import SHAPES, Table, load_catalog
 
 SEVERITIES = ("critical", "error", "warning")
 COUNT_TABLES = ("read_count", "coverage", "taxon_profile")
@@ -79,6 +79,15 @@ class _Checker:
             where = "the manifest" if name in listed else "the bundle folder"
             self.add("error", "manifest_matches_files", name, f"The table is only in {where}.")
         for name, body in cast(dict[str, Any], manifest.get("tables", {})).items():
+            if name not in self.catalog.tables and (
+                body.get("shape") not in SHAPES or not body.get("one_row_is")
+            ):
+                self.add(
+                    "error",
+                    "custom_table_declared",
+                    name,
+                    "A table outside the catalog must state its shape and what one row is.",
+                )
             for column, entry in cast(dict[str, Any], body.get("columns", {})).items():
                 if not entry.get("description"):
                     self.add(
