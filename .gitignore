@@ -1,1 +1,8 @@
 notes/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+examples/*/bundle/
+examples/*/work/

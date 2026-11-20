@@ -77,7 +77,7 @@ An optional column on `sequence` holds the digest of whichever strand sorts firs
 
 **Read pairs.** When a pipeline keeps both reads of a pair as one unit, the row holds both reads in two columns, each as sequenced. The identifier is the same hash taken over the first read, a comma, and the second read, with the prefix `RP.` in place of `SQ.` so it cannot be mistaken for the digest of a single sequence. Written in full, GA4GH identifiers carry the namespace `ga4gh:` and read pair identifiers carry `capsomer:`, so the two can never collide. Two optional columns hold each read's plain digest, so a pair can be matched to the same read stored alone in another bundle.
 
-**Genomes.** A genome identifier is derived from the identifiers of its member sequences, sorted and hashed. The same set of contigs is then the same genome in any bundle.
+**Genomes.** A genome identifier is derived from the identifiers of its member sequences, sorted and hashed, with the prefix `GN.`. The same set of contigs is then the same genome in any bundle.
 
 **Taxa.** A taxon identifier combines the reference release with the identifier that release uses.
 
@@ -102,6 +102,7 @@ A valid bundle needs the tables marked required, at least one count table, and t
 | `taxon` (required) | one taxon in one release | The release's own identifier, name, rank, parent taxon, genome composition (Baltimore class) and host category. A group in a catalog of uncultivated viruses is a taxon too, under that catalog's release. |
 | `genome` | one unit treated as a virus genome | Kind: single sequence, bin, or group of segments. |
 | `cluster` | one cluster of genomes or of sequences | Level (strain, species, genus, family, or a level the researcher defines) and the representative. A cluster needs no taxon name, so unclassified groups are first-class. |
+| `read` | one original read | Its library, the name the sequencer gave it, the read cluster it belongs to, and which end of the fragment it is. Optional, and large: one row per read. |
 
 `taxon` may also carry one column per major rank, holding the name of the ancestor at that rank. With those columns it reads like the taxonomy table of a phyloseq object. They are for reading; joins use identifiers.
 
@@ -215,7 +216,7 @@ The tables are designed to be joined. A result recorded at one level can be carr
 
 | From | To | Through |
 |---|---|---|
-| a read | its read cluster | `read_cluster_member`, where kept |
+| a read | its read cluster | `read`, where kept |
 | a read cluster | the contig it maps to, and where on it | `alignment`, with coordinates on the contig |
 | a contig | its genome, its cluster | `genome_member`, `cluster_member` |
 | any of these | its taxon, from each step of each pipeline | `taxon_assignment` |
@@ -227,7 +228,7 @@ Three examples of what this allows:
 - Context for a dark read. A read cluster that matched nothing, but aligns to a contig that has a taxon, inherits a candidate identity.
 - Context for a dark contig. A contig that matched nothing as a whole may be covered by reads with weak protein hits, which point to a distant relative.
 
-For this to work, a run that maps reads to contigs declares what it mapped: read clusters or every read. If it mapped every read, positions connect to read clusters only where `read_cluster_member` is kept.
+For this to work, a run that maps reads to contigs declares what it mapped: read clusters or every read. If it mapped every read, the `read` table connects each read's position to its read cluster, and an alignment row may name a read as its query.
 
 ## Dark matter
 
@@ -283,7 +284,6 @@ None is specified yet. They will be added in this order.
 | 5 | `feature` | thing | a gene or other interval on a sequence |
 | 5 | `function` | label | a protein family for a feature |
 | on demand | `genome_similarity` | link | identity and aligned fraction for a pair of genomes |
-| on demand | `read_cluster_member` | link | the original reads in a read cluster |
 
 `origin_class` has no counterpart in any surveyed tool. Version 1 already holds its inputs: the host category on `taxon` and the control type on `sample`.
 
@@ -373,3 +373,4 @@ None at present. The next step is to agree that scope and schema are settled.
 | 2026-11-20 | Each alignment states its search type. | Amino acid identity and nucleotide identity are not comparable. |
 | 2026-11-20 | The producer declares which hits were kept; the standard applies no filter. | Weak hits can be the only trace of an unknown virus, and the choice belongs to the researcher. |
 | 2026-11-20 | Connectivity is a rule: every result can be followed to the things it came from. | Read-level information carried onto contigs supports analyses such as detecting chimeric or recombinant contigs. |
+| 2026-11-20 | The table of original reads, `read`, is in version 1 as an optional thing table. | When every read is mapped to contigs, it is the only route from a mapping position back to read-level taxonomy. |

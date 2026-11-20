@@ -1,0 +1,486 @@
+id: https://github.com/shandley/capsomer
+name: capsomer
+title: Capsomer version 1 catalog
+description: >-
+  Tables of the Capsomer data standard for virome analysis results. Every class
+  is one table. Its `shape` annotation is one of thing, count, label or link,
+  and its `row` annotation states what one row is.
+license: MIT
+version: 0.1.0
+prefixes:
+  linkml: https://w3id.org/linkml/
+  capsomer: https://github.com/shandley/capsomer/
+default_prefix: capsomer
+default_range: string
+imports:
+  - linkml:types
+
+enums:
+  ControlType:
+    permissible_values:
+      not_control: {description: "An ordinary study sample."}
+      negative_control: {description: "A blank: extraction, reagent or library control."}
+      positive_control: {description: "A mock community or spiked sample."}
+      not_recorded: {description: "The source did not say whether the sample is a control."}
+  NucleicAcid:
+    permissible_values:
+      DNA: {}
+      RNA: {}
+      DNA_and_RNA: {}
+  Layout:
+    permissible_values:
+      single: {description: "One read per fragment."}
+      paired: {description: "Two reads per fragment."}
+  RunStep:
+    permissible_values:
+      pipeline: {description: "A whole pipeline execution that other runs belong to."}
+      read_qc: {}
+      read_clustering: {}
+      assembly: {}
+      search: {description: "A sequence similarity search or other classification step."}
+      taxon_decision: {description: "A step that decides the final taxon from earlier steps."}
+      read_mapping: {}
+      binning: {}
+      genome_clustering: {}
+      sequence_clustering: {}
+      other: {}
+  ReleaseKind:
+    permissible_values:
+      formal_taxonomy: {description: "A named taxonomy, such as an ICTV or NCBI release."}
+      catalog: {description: "A catalog of uncultivated viruses whose groups have no formal names."}
+      sequence_database: {}
+      other: {}
+  Molecule:
+    permissible_values:
+      nucleotide: {}
+      protein: {}
+      profile: {description: "A profile of a protein family."}
+  SequenceKind:
+    permissible_values:
+      read_cluster: {description: "The representative of a cluster of reads."}
+      read_pair_cluster: {description: "The representative of a cluster of read pairs kept as units."}
+      contig: {}
+      reference: {description: "A reference sequence whose bases the bundle holds."}
+  GenomeKind:
+    permissible_values:
+      single_sequence: {}
+      bin: {}
+      segment_group: {}
+  ReadForm:
+    permissible_values:
+      single: {description: "The library has one read per fragment."}
+      first_of_pair: {description: "The first read was used and the second set aside."}
+      merged_pair: {description: "Two overlapping reads joined into one sequence."}
+      one_of_pair: {description: "The two reads of a pair were treated as independent."}
+      pair: {description: "The two reads were kept together as one unit."}
+  ReadEnd:
+    permissible_values:
+      first: {}
+      second: {}
+      not_applicable: {}
+  CountUnit:
+    permissible_values:
+      fragments: {description: "A read pair counts once."}
+      reads: {description: "Each read counts once."}
+  Outcome:
+    permissible_values:
+      assigned: {description: "The run reached an answer."}
+      none: {description: "The run examined the thing and reached no answer."}
+  SearchType:
+    permissible_values:
+      nucleotide_to_nucleotide: {description: "Identity is measured in nucleotides."}
+      translated_nucleotide_to_protein: {description: "Identity is measured in amino acids."}
+      protein_to_protein: {description: "Identity is measured in amino acids."}
+      protein_to_profile: {}
+      kmer: {description: "Classification by shared k-mers, with no alignment."}
+      other: {}
+  AssignmentRule:
+    permissible_values:
+      top_hit: {}
+      lowest_common_ancestor: {}
+      majority: {}
+      classifier: {}
+      other: {}
+  Confidence:
+    permissible_values:
+      high: {}
+      medium: {}
+      low: {}
+  Strand:
+    permissible_values:
+      plus: {}
+      minus: {}
+  SequenceRelationKind:
+    permissible_values:
+      reverse_complement: {}
+      rotation: {description: "The same circular sequence written from a different start."}
+      part_of: {description: "The first sequence is a stretch of the second."}
+  TaxonChangeType:
+    permissible_values:
+      renamed: {}
+      moved: {}
+      merged: {}
+      split: {}
+      abolished: {}
+      unchanged: {}
+      other: {}
+  BaltimoreClass:
+    permissible_values:
+      I: {description: "Double-stranded DNA."}
+      II: {description: "Single-stranded DNA."}
+      III: {description: "Double-stranded RNA."}
+      IV: {description: "Positive-sense single-stranded RNA."}
+      V: {description: "Negative-sense single-stranded RNA."}
+      VI: {description: "Single-stranded RNA with reverse transcription."}
+      VII: {description: "Double-stranded DNA with reverse transcription."}
+
+classes:
+
+  # ---------------------------------------------------------------- things
+
+  Sample:
+    description: Samples in the study. Study metadata goes in extra columns.
+    annotations: {shape: thing, row: a sample, catalog_required: true}
+    attributes:
+      sample_id: {identifier: true, required: true, description: "Identifier of the sample, local to the bundle."}
+      name: {description: "The name the study uses for the sample."}
+      control_type: {range: ControlType, required: true, description: "Whether the sample is a control."}
+      collection_date: {description: "MIxS collection_date: when the sample was collected."}
+      geo_loc_name: {description: "MIxS geo_loc_name: country or sea, and region."}
+      lat_lon: {description: "MIxS lat_lon: latitude and longitude in decimal degrees."}
+      env_broad_scale: {description: "MIxS env_broad_scale: the major environment."}
+      env_local_scale: {description: "MIxS env_local_scale: the local environment."}
+      env_medium: {description: "MIxS env_medium: the material sampled."}
+      host_subject_id: {description: "MIxS host_subject_id: identifier of the individual sampled."}
+      host_taxid: {description: "MIxS host_taxid: NCBI taxonomy identifier of the host."}
+
+  Library:
+    description: Sequencing libraries. Counts are recorded per library.
+    annotations: {shape: thing, row: a sequencing library, catalog_required: true}
+    attributes:
+      library_id: {identifier: true, required: true, description: "Identifier of the library, local to the bundle."}
+      sample_id: {range: Sample, required: true, description: "The sample the library was made from."}
+      nucleic_acid: {range: NucleicAcid, description: "The nucleic acid sequenced."}
+      enrichment: {description: "How virus particles or nucleic acids were enriched, if at all."}
+      amplification: {description: "How nucleic acid was amplified, if at all."}
+      stranded: {range: boolean, description: "Whether the library keeps the strand of the template."}
+      layout: {range: Layout, description: "One or two reads per fragment."}
+      platform: {description: "Sequencing platform."}
+      reads_raw: {range: integer, description: "Reads before quality control.", annotations: {unit: reads}}
+      fragments_raw: {range: integer, description: "Fragments before quality control.", annotations: {unit: fragments}}
+      reads_after_qc: {range: integer, description: "Reads that passed quality control.", annotations: {unit: reads}}
+      fragments_after_qc: {range: integer, description: "Fragments that passed quality control.", annotations: {unit: fragments}}
+
+  Run:
+    description: Executions of tools. Every count, label and link row names the run that made it.
+    annotations: {shape: thing, row: one execution of one tool, catalog_required: true}
+    attributes:
+      run_id: {identifier: true, required: true, description: "Identifier of the run, local to the bundle."}
+      tool: {required: true, description: "Name of the tool or pipeline."}
+      tool_version: {description: "Version of the tool, as the tool reports it."}
+      step: {range: RunStep, required: true, description: "The kind of work the run did."}
+      parent_run_id: {range: Run, description: "The pipeline run this run is a step of."}
+      description: {description: "What the run did, in a sentence."}
+
+  ReferenceRelease:
+    description: Dated versions of the databases, taxonomies and catalogs that runs read.
+    annotations: {shape: thing, row: "one dated version of a database, taxonomy or catalog", catalog_required: true}
+    attributes:
+      reference_release_id: {identifier: true, required: true, description: "Identifier of the release, local to the bundle."}
+      name: {required: true, description: "Name of the database, taxonomy or catalog."}
+      version: {description: "Version label, as the provider gives it."}
+      release_date: {description: "Date of the release in ISO 8601 form."}
+      kind: {range: ReleaseKind, required: true, description: "What kind of reference this is."}
+      source: {description: "Where the release was obtained."}
+      checksum: {description: "Checksum of the release file."}
+      n_entries: {range: integer, description: "Number of entries in the release."}
+      n_residues: {range: integer, description: "Total bases or amino acids in the release. E-values depend on it."}
+
+  ReferenceEntry:
+    description: Database entries that something in the bundle matched.
+    annotations: {shape: thing, row: one database entry that something in the bundle matched}
+    attributes:
+      reference_entry_id: {identifier: true, required: true, description: "Identifier of the entry, local to the bundle."}
+      reference_release_id: {range: ReferenceRelease, required: true, description: "The release the entry belongs to."}
+      accession: {required: true, description: "The identifier the database uses for the entry."}
+      description: {description: "The description line the database gives the entry."}
+      length: {range: integer, description: "Length of the entry, in its own residues."}
+      molecule: {range: Molecule, description: "Nucleotide, protein or profile."}
+      taxon_id: {range: Taxon, description: "The taxon the database assigns the entry to."}
+
+  Sequence:
+    description: >-
+      Nucleotide sequences: representatives of read clusters, contigs, and
+      reference sequences whose bases the bundle holds.
+    annotations: {shape: thing, row: "one nucleotide sequence, or one read pair kept as a unit", catalog_required: true}
+    attributes:
+      sequence_id:
+        identifier: true
+        required: true
+        description: >-
+          GA4GH sequence digest of the bases as written, with prefix SQ. For a
+          read pair, the same digest over both reads joined by a comma, with
+          prefix RP.
+      kind: {range: SequenceKind, required: true, description: "What the sequence is."}
+      length: {range: integer, required: true, description: "Number of bases. For a read pair, of the first read.", annotations: {unit: bases}}
+      bases: {description: "The bases, in upper case. For a read pair, the first read as sequenced."}
+      mate_bases: {description: "For a read pair, the second read as sequenced."}
+      first_read_digest: {description: "For a read pair, the SQ. digest of the first read alone."}
+      second_read_digest: {description: "For a read pair, the SQ. digest of the second read alone."}
+      name: {description: "The name the producing run gave the sequence. Never a key."}
+      run_id: {range: Run, description: "The run that produced the sequence, for contigs."}
+      gc_content: {range: float, description: "Fraction of bases that are G or C.", minimum_value: 0, maximum_value: 1}
+      complexity: {range: float, description: "A sequence complexity score. The producing run states the method."}
+
+  Taxon:
+    description: >-
+      Taxa, each within one reference release. A group in a catalog of
+      uncultivated viruses is a taxon under that catalog's release.
+    annotations: {shape: thing, row: one taxon in one release, catalog_required: true}
+    attributes:
+      taxon_id: {identifier: true, required: true, description: "Identifier of the taxon within the bundle. It combines the release with the release's own identifier."}
+      reference_release_id: {range: ReferenceRelease, required: true, description: "The release the taxon belongs to."}
+      native_id: {description: "The identifier the release itself uses for the taxon."}
+      name: {required: true, description: "Name of the taxon in this release. Never a key."}
+      rank: {description: "Rank of the taxon, as the release names it."}
+      parent_taxon_id: {range: Taxon, description: "The taxon one step up in the same release."}
+      genome_composition: {description: "Genome composition, such as dsDNA or ssRNA(+)."}
+      baltimore_class: {range: BaltimoreClass, description: "Baltimore class."}
+      host_category: {description: "The broad kind of host, such as bacteria, plants or vertebrates."}
+      domain_name: {description: "Name of the ancestor at domain rank, or Viruses. For reading, not joining."}
+      realm_name: {description: "Name of the ancestor at realm rank. For reading, not joining."}
+      kingdom_name: {description: "Name of the ancestor at kingdom rank. For reading, not joining."}
+      phylum_name: {description: "Name of the ancestor at phylum rank. For reading, not joining."}
+      class_name: {description: "Name of the ancestor at class rank. For reading, not joining."}
+      order_name: {description: "Name of the ancestor at order rank. For reading, not joining."}
+      family_name: {description: "Name of the ancestor at family rank. For reading, not joining."}
+      genus_name: {description: "Name of the ancestor at genus rank. For reading, not joining."}
+      species_name: {description: "Name of the ancestor at species rank. For reading, not joining."}
+
+  Genome:
+    description: Units treated as virus genomes.
+    annotations: {shape: thing, row: one unit treated as a virus genome}
+    attributes:
+      genome_id: {identifier: true, required: true, description: "Digest of the sorted identifiers of the member sequences, with prefix GN."}
+      kind: {range: GenomeKind, required: true, description: "Single sequence, bin, or group of segments."}
+      run_id: {range: Run, description: "The run that formed the genome, for bins and segment groups."}
+      n_sequences: {range: integer, description: "Number of member sequences."}
+      total_length: {range: integer, description: "Summed length of the member sequences.", annotations: {unit: bases}}
+
+  Cluster:
+    description: Clusters of genomes or of sequences. A cluster needs no taxon name.
+    annotations: {shape: thing, row: one cluster of genomes or of sequences, exactly_one: "representative_genome_id representative_sequence_id"}
+    attributes:
+      cluster_id: {identifier: true, required: true, description: "Identifier of the cluster, local to the bundle."}
+      level: {required: true, description: "Strain, species, genus, family, or a level the researcher defines."}
+      run_id: {range: Run, required: true, description: "The run that formed the cluster. Its thresholds are in run_parameter."}
+      representative_genome_id: {range: Genome, description: "The representative, when the cluster groups genomes."}
+      representative_sequence_id: {range: Sequence, description: "The representative, when the cluster groups sequences."}
+
+  Read:
+    description: Original reads. Optional, and large.
+    annotations: {shape: thing, row: one original read}
+    attributes:
+      read_id: {identifier: true, required: true, description: "Identifier of the read, local to the bundle."}
+      library_id: {range: Library, required: true, description: "The library the read came from."}
+      name: {required: true, description: "The name the sequencer gave the read."}
+      read_end: {range: ReadEnd, required: true, description: "Which end of the fragment the read is."}
+      sequence_id: {range: Sequence, description: "The read cluster the read belongs to."}
+
+  # ---------------------------------------------------------------- counts
+
+  ReadCount:
+    description: Sizes of read clusters in each library.
+    annotations: {shape: count, row: "one read cluster in one library, in one read form"}
+    unique_keys:
+      primary:
+        unique_key_slots: [sequence_id, library_id, run_id, read_form, read_end]
+    attributes:
+      sequence_id: {range: Sequence, required: true, description: "The read cluster."}
+      library_id: {range: Library, required: true, description: "The library."}
+      run_id: {range: Run, required: true, description: "The run that clustered the reads."}
+      read_form: {range: ReadForm, required: true, description: "What the pipeline did with the two reads of a pair."}
+      read_end: {range: ReadEnd, required: true, description: "For independent reads, the end of the fragment. Otherwise not_applicable."}
+      count:
+        range: integer
+        required: true
+        minimum_value: 1
+        description: Number of fragments or reads in the cluster. Not an abundance.
+        annotations: {measure: raw, summable: true, unit_column: count_unit}
+      count_unit: {range: CountUnit, required: true, description: "Whether count is in fragments or reads."}
+      name: {description: "The name the producing run gave the cluster in this library. Never a key."}
+
+  Coverage:
+    description: Reads mapped to contigs, per library.
+    annotations: {shape: count, row: one contig in one library}
+    unique_keys:
+      primary:
+        unique_key_slots: [sequence_id, library_id, run_id]
+    attributes:
+      sequence_id: {range: Sequence, required: true, description: "The contig."}
+      library_id: {range: Library, required: true, description: "The library."}
+      run_id: {range: Run, required: true, description: "The run that mapped the reads."}
+      mapped_count:
+        range: integer
+        description: Fragments or reads mapped to the contig.
+        annotations: {measure: raw, summable: true, unit_column: count_unit}
+      count_unit: {range: CountUnit, description: "Whether mapped_count is in fragments or reads."}
+      mean_depth: {range: float, description: "Mean depth over the contig.", annotations: {measure: raw, summable: false, unit: fold}}
+      covered_fraction: {range: float, minimum_value: 0, maximum_value: 1, description: "Fraction of the contig covered by at least one read.", annotations: {measure: raw, summable: false}}
+      covered_bases: {range: integer, description: "Bases covered by at least one read.", annotations: {measure: raw, summable: false, unit: bases}}
+
+  # ---------------------------------------------------------------- labels
+
+  TaxonAssignment:
+    description: >-
+      Taxa given to sequences, genomes or clusters. Each step of a pipeline
+      writes its own rows. A search that found nothing writes a row with no
+      taxon and outcome none.
+    annotations:
+      shape: label
+      row: "one taxon given to one sequence, genome or cluster by one run, or the record that the run found none"
+      catalog_required: true
+      exactly_one: "sequence_id genome_id cluster_id"
+    attributes:
+      sequence_id: {range: Sequence, description: "The sequence described, if the subject is a sequence."}
+      genome_id: {range: Genome, description: "The genome described, if the subject is a genome."}
+      cluster_id: {range: Cluster, description: "The cluster described, if the subject is a cluster."}
+      run_id: {range: Run, required: true, description: "The run that made the call."}
+      outcome: {range: Outcome, required: true, description: "Whether the run reached an answer."}
+      taxon_id: {range: Taxon, description: "The taxon assigned. Empty when outcome is none."}
+      search_type: {range: SearchType, description: "What was compared with what."}
+      rule: {range: AssignmentRule, description: "How the taxon was chosen from the evidence."}
+      score: {range: float, description: "The score the run attaches to the call."}
+      score_type: {description: "What the score is."}
+      confidence: {range: Confidence, description: "The run's confidence tier, if it gives one."}
+      is_preferred: {range: boolean, description: "True for the final answer of the pipeline that produced the row."}
+      detail: {description: "Tool-specific extras as a JSON string."}
+
+  RunParameter:
+    description: Settings of runs. Every threshold that decides which rows exist is listed here.
+    annotations: {shape: label, row: one setting of one run}
+    unique_keys:
+      primary:
+        unique_key_slots: [run_id, name]
+    attributes:
+      run_id: {range: Run, required: true, description: "The run."}
+      name: {required: true, description: "Name of the setting."}
+      value: {description: "Value of the setting, as text."}
+      unit: {description: "Unit of the value."}
+
+  IdentifierMap:
+    description: Identifiers that other systems use for things in the bundle.
+    annotations:
+      shape: label
+      row: "one external identifier for one sample, library, sequence or genome"
+      exactly_one: "sample_id library_id sequence_id genome_id"
+    attributes:
+      sample_id: {range: Sample, description: "The sample, if the subject is a sample."}
+      library_id: {range: Library, description: "The library, if the subject is a library."}
+      sequence_id: {range: Sequence, description: "The sequence, if the subject is a sequence."}
+      genome_id: {range: Genome, description: "The genome, if the subject is a genome."}
+      authority: {required: true, description: "The system that issued the identifier, such as BioSample or HVP."}
+      external_id: {required: true, description: "The identifier in that system."}
+
+  # ---------------------------------------------------------------- links
+
+  Alignment:
+    description: >-
+      Alignments of a sequence or read to another sequence in the bundle or to a
+      database entry. Read-to-contig mappings and database hits both go here.
+    annotations:
+      shape: link
+      row: one alignment of one sequence to another sequence or to a reference entry
+      exactly_one: "query_sequence_id query_read_id; target_sequence_id target_reference_entry_id"
+    attributes:
+      query_sequence_id: {range: Sequence, description: "The query, if it is a sequence."}
+      query_read_id: {range: Read, description: "The query, if it is an original read."}
+      target_sequence_id: {range: Sequence, description: "The target, if the bundle holds it."}
+      target_reference_entry_id: {range: ReferenceEntry, description: "The target, if it is a database entry."}
+      run_id: {range: Run, required: true, description: "The run that made the alignment."}
+      search_type: {range: SearchType, required: true, description: "What was compared with what. Decides the units of identity and coordinates."}
+      pair_read: {range: ReadEnd, description: "For a read pair query, which read aligned."}
+      query_start: {range: integer, description: "First aligned position on the query, 1-based, inclusive, in query residues."}
+      query_end: {range: integer, description: "Last aligned position on the query, 1-based, inclusive. Never less than query_start."}
+      query_strand: {range: Strand, description: "The strand of the query that aligned."}
+      query_frame: {range: integer, description: "Reading frame of a translated query: 1 to 3 on the given strand."}
+      target_start: {range: integer, description: "First aligned position on the target, 1-based, inclusive, in target residues."}
+      target_end: {range: integer, description: "Last aligned position on the target, 1-based, inclusive."}
+      identity: {range: float, minimum_value: 0, maximum_value: 1, description: "Fraction of aligned positions that are identical. Amino acids or nucleotides according to search_type."}
+      alignment_length: {range: integer, description: "Number of columns in the alignment."}
+      mismatches: {range: integer, description: "Number of mismatched positions."}
+      evalue: {range: float, description: "Expected number of chance hits this good.", annotations: {comparable: within_run}}
+      bit_score: {range: float, description: "Bit score of the alignment.", annotations: {comparable: across_runs}}
+      query_coverage: {range: float, minimum_value: 0, maximum_value: 1, description: "Fraction of the query aligned."}
+      target_coverage: {range: float, minimum_value: 0, maximum_value: 1, description: "Fraction of the target aligned."}
+      mapping_quality: {range: integer, description: "Mapping quality, for read mappers that report it."}
+      is_primary: {range: boolean, description: "True for the one alignment of a query that counts when counts are summed."}
+
+  GenomeMember:
+    description: Membership of sequences in genomes.
+    annotations: {shape: link, row: one sequence in one genome}
+    unique_keys:
+      primary:
+        unique_key_slots: [genome_id, sequence_id]
+    attributes:
+      genome_id: {range: Genome, required: true, description: "The genome."}
+      sequence_id: {range: Sequence, required: true, description: "The member sequence."}
+      segment_label: {description: "Name of the segment, for segmented genomes."}
+      run_id: {range: Run, description: "The run that placed the sequence, for bins and segment groups."}
+
+  ClusterMember:
+    description: Membership of genomes, sequences or reference entries in clusters.
+    annotations:
+      shape: link
+      row: one member of one cluster
+      exactly_one: "genome_id sequence_id reference_entry_id"
+    attributes:
+      cluster_id: {range: Cluster, required: true, description: "The cluster."}
+      genome_id: {range: Genome, description: "The member, if it is a genome."}
+      sequence_id: {range: Sequence, description: "The member, if it is a sequence."}
+      reference_entry_id: {range: ReferenceEntry, description: "The member, if it is a reference entry."}
+      is_representative: {range: boolean, description: "True for the member that represents the cluster."}
+
+  SequenceRelation:
+    description: Stated relations between two sequences that their identifiers do not show.
+    annotations: {shape: link, row: one stated relation between two sequences}
+    unique_keys:
+      primary:
+        unique_key_slots: [from_sequence_id, to_sequence_id, relation]
+    attributes:
+      from_sequence_id: {range: Sequence, required: true, description: "The first sequence."}
+      to_sequence_id: {range: Sequence, required: true, description: "The second sequence."}
+      relation: {range: SequenceRelationKind, required: true, description: "How the first relates to the second."}
+      region_start: {range: integer, description: "For part_of, the first position on the second sequence, 1-based, inclusive."}
+      region_end: {range: integer, description: "For part_of, the last position on the second sequence, 1-based, inclusive."}
+      region_strand: {range: Strand, description: "For part_of, the strand of the second sequence."}
+      run_id: {range: Run, description: "The run that found the relation."}
+
+  RunReference:
+    description: Which reference releases each run read.
+    annotations: {shape: link, row: one reference release read by one run}
+    unique_keys:
+      primary:
+        unique_key_slots: [run_id, reference_release_id]
+    attributes:
+      run_id: {range: Run, required: true, description: "The run."}
+      reference_release_id: {range: ReferenceRelease, required: true, description: "The release it read."}
+
+  RunInput:
+    description: Which runs fed which. This records the order of a search chain.
+    annotations: {shape: link, row: one run taking its input from another}
+    unique_keys:
+      primary:
+        unique_key_slots: [run_id, upstream_run_id]
+    attributes:
+      run_id: {range: Run, required: true, description: "The run that took the input."}
+      upstream_run_id: {range: Run, required: true, description: "The run whose results were the input."}
+      selection: {description: "Which of the upstream results were taken, in words."}
+
+  TaxonChange:
+    description: Changes to taxa between two releases. Re-annotation is a join through this table.
+    annotations: {shape: link, row: one change to a taxon between two releases}
+    attributes:
+      old_taxon_id: {range: Taxon, description: "The taxon in the older release. Empty for a new taxon."}
+      new_taxon_id: {range: Taxon, description: "The taxon in the newer release. Empty for an abolished taxon."}
+      change_type: {range: TaxonChangeType, required: true, description: "What changed."}

@@ -1,0 +1,42 @@
+[project]
+name = "capsomer"
+version = "0.1.0"
+description = "Reference implementation of Capsomer, a data standard for virome analysis results"
+readme = "README.md"
+license = "MIT"
+authors = [{ name = "Scott Handley" }]
+requires-python = ">=3.12"
+dependencies = [
+    "duckdb>=2.0.1",
+    "pyyaml>=6.0.3",
+]
+
+[project.scripts]
+capsomer = "capsomer.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.13.7,<0.14.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "linkml>=1.12.1",
+    "pyright>=1.1.414",
+    "pytest>=9.2.0",
+    "ruff>=0.17.6",
+    "types-pyyaml>=6.0.12.20261113",
+]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["E501"]  # the formatter wraps what it can; SQL strings stay whole
+
+[tool.pyright]
+include = ["src", "tests"]
+typeCheckingMode = "strict"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
