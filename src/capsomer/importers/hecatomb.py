@@ -66,7 +66,7 @@ def fasta_records(path: Path) -> Iterator[tuple[str, str]]:
 def tsv(path: Path) -> str:
     return (
         f"read_csv({literal(str(path))}, delim='\\t', header=true, all_varchar=true, "
-        "quote='', escape='', nullstr='NA')"
+        "quote='', escape='', nullstr='NA', null_padding=true, strict_mode=false)"
     )
 
 

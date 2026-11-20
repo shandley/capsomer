@@ -107,8 +107,11 @@ def make_results(folder: Path) -> Path:
         f">contig_1\n{CONTIG}\n>contig_2\nAAAAACCCCCGGGGGTTTTT\n"
     )
     (folder / "contigSeqTable.tsv").write_text(
-        "contigID\tseqID\tstart\tstop\tlen\tqual\n"
-        "contig_1\ts1:3:0\t1\t20\t20\t60\ncontig_1\ts2:2:0\t1\t20\t20\t60\ncontig_1\ts2:1:1\t31\t50\t20\t60\n"
+        # Real Hecatomb output has rows with fewer fields than the header.
+        "contigID\tseqID\tstart\tstop\tlen\tqual\tcount\tCPM\talnType\tkingdom\n"
+        "contig_1\ts1:3:0\t1\t20\t20\t60\t3\t1.0\taa\tViruses\n"
+        "contig_1\ts2:2:0\t1\t20\t20\t60\t2\t1.0\taa\tViruses\n"
+        "contig_1\ts2:1:1\t31\t50\t20\t60\tNA\tNA\n"
     )
     (folder / "contig_count_table.tsv").write_text(
         "sample_id\tcontig_id\tlength\treads\tavg_fold_cov\tcov_perc\tcov_bases\n"
