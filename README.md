@@ -37,8 +37,9 @@ The name comes from the capsomer, the repeating protein unit from which a virus 
 - `spec/data-model-draft.md`: the current draft of the standard, with a log of decisions made.
 - `src/capsomer/schema/capsomer.yaml`: the catalog of tables, written in LinkML (the schema language that the MIxS sample vocabulary uses). Each table states its shape and what one row is.
 - `src/capsomer/`: a Python library that loads the schema, computes sequence identifiers, writes tables, builds the manifest and checks a dataset against the standard.
-- `src/capsomer/importers/`: importers. One reads Hecatomb version 1 results. One reads the ground truth of a [ViroForge](https://github.com/shandley/viroforge) synthetic dataset, which gives a dataset that no analysis pipeline shaped.
+- `src/capsomer/importers/`: importers. Some add one tool's results to a dataset: contigs from any assembler, geNomad, CheckV, clusters from vclust or MMseqs2, CoverM coverage, read mappings (SAM or BAM), sequence alignments (PAF) and fastp read totals. Two build a whole dataset: one from Hecatomb version 1 results, and one from the ground truth of a [ViroForge](https://github.com/shandley/viroforge) synthetic dataset.
 - `examples/questions.sql`: test questions from the specification, written as SQL.
+- `examples/viroforge_skin/`: a worked example. Two assemblers, geNomad, CheckV, two clustering tools and a read mapper were run on simulated reads, and their results were added to the simulation's ground truth, so every result can be checked against what is true.
 
 The draft rests on three background surveys of existing data formats, virome tool outputs and consortium data models. Those are working notes and are not published here.
 
@@ -50,9 +51,15 @@ The library needs Python 3.12 and [uv](https://docs.astral.sh/uv/).
 uv sync
 uv run pytest
 
-# Build a dataset from Hecatomb results, then check it.
-uv run capsomer import-hecatomb path/to/hecatomb/results my_dataset --n-samples 4
+# Start a dataset from a sample table, then add each tool's results.
+uv run capsomer init my_dataset samples.tsv
+uv run capsomer add contigs my_dataset contigs.fasta --run-id assembly --assembler megahit --library sample1
+uv run capsomer add genomad my_dataset genomad_out/ contigs.fasta --run-id genomad --input assembly
+uv run capsomer add checkv my_dataset checkv_out/ viruses.fna --run-id checkv --input genomad
 uv run capsomer validate my_dataset
+
+# Or build a dataset from Hecatomb results.
+uv run capsomer import-hecatomb path/to/hecatomb/results my_dataset --n-samples 4
 
 # Build a ground-truth dataset from a ViroForge simulation.
 uv run capsomer import-viroforge path/to/viroforge/output truth_dataset
@@ -66,7 +73,7 @@ A dataset is plain Parquet, so DuckDB, Python, R or any other Parquet reader can
 
 ## Background
 
-Capsomer is not tied to any pipeline. A dataset can come from a read classifier that reports only taxa, from an assembly workflow, or from a pipeline that does both. The first importer is for [Hecatomb](https://github.com/shandley/hecatomb), because its results were at hand; importers for other tools will follow.
+Capsomer is not tied to any pipeline. A dataset can come from a read classifier that reports only taxa, from an assembly workflow, or from a pipeline that does both. Tools report results by sequence name; an importer reads the FASTA file the tool was given, computes each sequence's identifier from its bases, and joins on that. `capsomer add --help` lists the tools that can be added today.
 
 ## Licence
 
