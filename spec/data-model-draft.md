@@ -293,12 +293,14 @@ A result the catalog does not cover goes in a table whose name starts with `x_`.
 
 A table enters the catalog when real output of a widely used tool fills it. It stays provisional until the output of a second, independent tool fills it too.
 
-`viral_call` and `quality` have passed that test. Two tools were imported for each, from real output:
+`viral_call` and `quality` have passed that test, from real output:
 
-| Table | First tool | Second tool | Columns only one tool fills |
-|---|---|---|---|
-| `viral_call` | geNomad 1.13 | VirSorter2 2.2.4 | `plasmid_score` and `cellular_score` (geNomad) |
-| `quality` | CheckV 1.1 | CheckM2 1.1 | `tier` and `miuvig_tier` (CheckV) |
+| Table | Tools imported | Columns only one tool fills |
+|---|---|---|
+| `viral_call` | geNomad 1.13, VirSorter2 2.2.4, Cenote-Taker 3.4, PhaBOX2 2.2, Jaeger 1.26 | none |
+| `quality` | CheckV 1.1, CheckM2 1.1 | `tier` and `miuvig_tier` (CheckV) |
+
+The five classifiers differ in what they report: three scores, one score, or none; a call for every sequence, or a list of the viral ones. All five fit `viral_call` without a change to it. Jaeger is the one that uses the call `cellular`.
 
 CheckM2 scores bacterial and archaeal genomes, so it tests the table's second subject: a genome made of several sequences. A second quality tool for viruses has not been imported.
 
@@ -416,3 +418,4 @@ None at present. The next step is to agree that scope and schema are settled.
 | 2026-11-20 | Completeness and contamination are stored as fractions. | Identity and coverage are already fractions, and one convention avoids errors of a factor of 100. |
 | 2026-11-20 | A table enters the catalog on real output of one tool and stays provisional until a second independent tool fills it. | It keeps the catalog from taking the shape of any one tool. |
 | 2026-11-20 | `viral_call` and `quality` are no longer provisional. | VirSorter2 and CheckM2 output filled them with no change to either table. |
+| 2026-11-20 | Three more classifiers (Cenote-Taker 3, PhaBOX2, Jaeger) were imported into `viral_call` unchanged. | Five tools with different outputs now fill one table, and their calls on the same sequences can be compared by query. |
